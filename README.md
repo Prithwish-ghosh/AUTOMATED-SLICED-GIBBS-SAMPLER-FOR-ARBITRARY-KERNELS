@@ -57,5 +57,3 @@ Compared to Metropolis–Hastings (MH), the proposed method achieves **higher st
 
 ---
 
-## 📂 Repository Structure
-
