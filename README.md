@@ -48,12 +48,68 @@ Compared to Metropolis–Hastings (MH), the proposed method achieves **higher st
 
 ## 📊 Example Results
 
-- **Rosenbrock distribution**:  
-  - MH sampler: poor mixing, low ESS.  
-  - Automated Gibbs sampler: adapts to curved geometry, achieves an order-of-magnitude higher ESS.  
+### Rosenbrock (“banana-shaped”) distribution
 
-- **Time-based analysis**:  
-  The proposed sampler maintains higher ESS/s across varying run times, while MH degrades quickly.
+- **MH sampler**: poor mixing, low ESS.  
+- **Automated Sliced Gibbs**: adapts to curved geometry, achieves much higher ESS.
+
+<figure>
+  <p align="center">
+    <img src="figures/rosenbrock_trace.png" alt="Trace plot on Rosenbrock" width="85%">
+  </p>
+  <figcaption>
+    <p align="center">
+      <b>Figure 1:</b> Trace plot on the Rosenbrock target. ASG exhibits faster traversal and reduced sticking compared to baseline MH.
+    </p>
+  </figcaption>
+</figure>
+
+<figure>
+  <p align="center">
+    <img src="figures/rosenbrock_acf.png" alt="ACF on Rosenbrock" width="85%">
+  </p>
+  <figcaption>
+    <p align="center">
+      <b>Figure 2:</b> Autocorrelation (ACF) for a representative coordinate. ASG yields lower autocorrelation across lags, indicating better mixing.
+    </p>
+  </figcaption>
+</figure>
 
 ---
+
+### Density recovery (univariate conditional example)
+
+<figure>
+  <p align="center">
+    <img src="figures/univariate_density_overlay.png" alt="Histogram with target overlay" width="85%">
+  </p>
+  <figcaption>
+    <p align="center">
+      <b>Figure 3:</b> Histogram of ASG samples with an (initial-conditional) normalized density overlay computed from effective support estimation.
+    </p>
+  </figcaption>
+</figure>
+
+---
+
+### Time-based efficiency (ESS/s)
+
+The proposed sampler maintains higher ESS/s across varying run times, while MH degrades quickly.
+
+<figure>
+  <p align="center">
+    <img src="figures/ess_per_second.png" alt="ESS per second comparison" width="85%">
+  </p>
+  <figcaption>
+    <p align="center">
+      <b>Figure 4:</b> Time-aware efficiency comparison using ESS/s. Higher is better.
+    </p>
+  </figcaption>
+</figure>
+
+---
+
+## 🗂️ Suggested figure folder layout
+
+Place images here:
 
