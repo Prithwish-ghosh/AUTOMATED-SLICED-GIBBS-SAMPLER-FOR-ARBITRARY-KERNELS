@@ -48,44 +48,42 @@ Compared to Metropolis–Hastings (MH), the proposed method achieves **higher st
 
 ## 📊 Example Results
 
-### Rosenbrock (“banana-shaped”) distribution
 
-- **MH sampler**: poor mixing, low ESS.  
-- **Automated Sliced Gibbs**: adapts to curved geometry, achieves much higher ESS.
+### Density recovery comparison (univariate conditional example)
 
 <figure>
   <p align="center">
-    <img src="figures/rosenbrock_trace.png" alt="Trace plot on Rosenbrock" width="85%">
-  </p>
-  <figcaption>
-    <p align="center">
-      <b>Figure 1:</b> Trace plot on the Rosenbrock target. ASG exhibits faster traversal and reduced sticking compared to baseline MH.
-    </p>
-  </figcaption>
-</figure>
-
-<figure>
-  <p align="center">
-    <img src="figures/rosenbrock_acf.png" alt="ACF on Rosenbrock" width="85%">
-  </p>
-  <figcaption>
-    <p align="center">
-      <b>Figure 2:</b> Autocorrelation (ACF) for a representative coordinate. ASG yields lower autocorrelation across lags, indicating better mixing.
-    </p>
-  </figcaption>
-</figure>
-
----
-
-### Density recovery (univariate conditional example)
-
-<figure>
-  <p align="center">
-    <img src="figures/denisty.png" alt="Histogram with target overlay" width="85%">
+    <img src="figures/comparisonnnnn.png" alt="Histogram with target overlay compared between ASG and MH" width="85%">
   </p>
   <figcaption>
     <p align="center">
       <b>Figure 3:</b> sample histogram of ASG samples with density overlay computed from effective support estimation for univariate kernel.
+    </p>
+  </figcaption>
+</figure>
+
+### Density recovery (Rosenbrock kernel conditional example)
+
+<figure>
+  <p align="center">
+    <img src="figures/density_overlay.png" alt="Histogram with target overlay" width="85%">
+  </p>
+  <figcaption>
+    <p align="center">
+      <b>Figure 3:</b> Sample histogram of ASG samples with density overlay computed from effective support estimation for Rosenbrock kernel.
+    </p>
+  </figcaption>
+</figure>
+
+### Density recovery (Ackley kernel conditional example)
+
+<figure>
+  <p align="center">
+    <img src="figures/ackley_density.png" alt="Histogram with target overlay" width="85%">
+  </p>
+  <figcaption>
+    <p align="center">
+      <b>Figure 3:</b> Sample histogram of ASG samples with density overlay computed from effective support estimation for Ackleykernel.
     </p>
   </figcaption>
 </figure>
@@ -98,11 +96,26 @@ The proposed sampler maintains higher ESS/s across varying run times, while MH d
 
 <figure>
   <p align="center">
-    <img src="figures/ess_per_second.png" alt="ESS per second comparison" width="85%">
+    <img src="figures/time fixed.png" alt="ESS per second comparison" width="85%">
   </p>
   <figcaption>
     <p align="center">
       <b>Figure 4:</b> Time-aware efficiency comparison using ESS/s. Higher is better.
+    </p>
+  </figcaption>
+</figure>
+
+### Sample-based efficiency (ESS/s)
+
+The proposed sampler maintains higher ESS/s across varying samples, while MH degrades quickly.
+
+<figure>
+  <p align="center">
+    <img src="figures/samples fixed time varied.png" alt="ESS per second comparison" width="85%">
+  </p>
+  <figcaption>
+    <p align="center">
+      <b>Figure 4:</b> Sample-aware efficiency comparison using ESS/s. Higher is better.
     </p>
   </figcaption>
 </figure>
