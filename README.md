@@ -124,7 +124,3 @@ The proposed sampler maintains higher ESS/s across varying samples, while MH deg
 
 ---
 
-## 🗂️ Suggested figure folder layout
-
-Place images here:
-
