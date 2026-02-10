@@ -3,7 +3,8 @@
 This repository contains the code and experiments accompanying the paper:
 
 > **Automated Sliced Gibbs Sampler for Arbitrary Kernels**  
-> Prithwish Ghosh, 2025
+> Prithwish Ghosh & Sujit K Ghosh
+> Department of Statistics, North Carolina State University, Raleigh, NC, USA
 
 ## 📌 Overview
 
