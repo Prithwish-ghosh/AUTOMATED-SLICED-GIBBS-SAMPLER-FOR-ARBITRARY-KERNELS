@@ -81,11 +81,11 @@ Compared to Metropolis–Hastings (MH), the proposed method achieves **higher st
 
 <figure>
   <p align="center">
-    <img src="figures/univariate_density_overlay.png" alt="Histogram with target overlay" width="85%">
+    <img src="figures/denisty.png" alt="Histogram with target overlay" width="85%">
   </p>
   <figcaption>
     <p align="center">
-      <b>Figure 3:</b> Histogram of ASG samples with an (initial-conditional) normalized density overlay computed from effective support estimation.
+      <b>Figure 3:</b> sample histogram of ASG samples with density overlay computed from effective support estimation for univariate kernel.
     </p>
   </figcaption>
 </figure>
