@@ -1,3 +1,4 @@
+rm(list = ls())
 library(coda)
 library(ggplot2)
 setwd("~/Downloads/ASG Sampler/code")
@@ -216,7 +217,7 @@ final_data_10000$kernel = c("univariate", "Rosenbrock", "ackley", "univariate", 
 
 #### Final plot dataset #######
 plot_final_dataset = rbind(final_data_1000, final_data_5000, final_data_10000)
-plot_final_dataset$time = log10(plot_final_dataset$time)
+plot_final_dataset$time = (plot_final_dataset$time)*10
 
 ggplot(plot_final_dataset,
        aes(x = time,
@@ -227,7 +228,7 @@ ggplot(plot_final_dataset,
   geom_point(size = 5) +
   geom_line(aes(group = interaction(method, kernel)), linewidth = 1) +
   labs(
-    x = "log(Time)",
+    x = "Time X 10",
     y = "ESS/N",
     shape = "Time (s)",
     color = "Method",
