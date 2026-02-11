@@ -70,7 +70,7 @@ MH_data = data.frame("ESS/N" = df_mh, "Log(N)" = log10(df_mh_iter), "time" = c(1
 MH_data
 
 # Add an identifier column to each dataset
-proposed_data$Method <- "Proposed"
+proposed_data$Method <- "ASG"
 MH_data$Method <- "MH"
 
 # Combine the datasets
@@ -174,7 +174,7 @@ MH_data_b = data.frame("ESS/N" = df_mh_b, "Log(N)" = log10(df_mh_iter_b), "time"
 MH_data_b
 
 # Add an identifier column to each dataset
-proposed_data_b$Method <- "Proposed"
+proposed_data_b$Method <- "ASG"
 MH_data_b$Method <- "MH"
 
 # Combine the datasets
@@ -312,7 +312,7 @@ MH_data_a = data.frame("ESS/N" = df_mh_a, "Log(N)" = log10(df_mh_iter_a), "time"
 MH_data_a
 
 # Add an identifier column to each dataset
-proposed_data_a$Method <- "Proposed"
+proposed_data_a$Method <- "ASG"
 MH_data_a$Method <- "MH"
 
 # Combine the datasets
@@ -322,7 +322,7 @@ all_data_a$kernel = "Ackley Kernel"
 
 
 all_dataset_final = rbind(all_dataset, all_data_a)
-
+all_dataset_final
 
 #### Plot
 
