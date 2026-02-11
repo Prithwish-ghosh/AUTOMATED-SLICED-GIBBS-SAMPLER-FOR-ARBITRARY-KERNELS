@@ -26,6 +26,7 @@ We introduce an **automated Gibbs sampling framework** that integrates:
 
 Compared to Metropolis–Hastings (MH), the proposed method achieves **higher statistical efficiency** (greater ESS) and demonstrates **better time-aware performance** (higher ESS/s under fixed run times).  
 
+The arxiv version of the article can be found here 
 ---
 
 ## ✨ Key Features
