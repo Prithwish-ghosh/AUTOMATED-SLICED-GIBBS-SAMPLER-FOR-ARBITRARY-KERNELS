@@ -98,7 +98,7 @@ The proposed sampler maintains higher ESS/s across varying run times, while MH d
 
 <figure>
   <p align="center">
-    <img src="figures/time fixed.png" alt="ESS per second comparison" width="85%">
+    <img src="figures/Time_fixed_sample_comparison.png" alt="ESS per second comparison" width="85%">
   </p>
   <figcaption>
     <p align="center">
