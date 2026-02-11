@@ -113,7 +113,7 @@ The proposed sampler maintains higher ESS/s across varying samples, while MH deg
 
 <figure>
   <p align="center">
-    <img src="figures/samples fixed time varied.png" alt="ESS per second comparison" width="85%">
+    <img src="figures/sample_fixed_time_varied_plot_comparison.png" alt="ESS per second comparison" width="85%">
   </p>
   <figcaption>
     <p align="center">
