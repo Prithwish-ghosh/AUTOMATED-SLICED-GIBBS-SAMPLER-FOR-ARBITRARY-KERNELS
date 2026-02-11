@@ -139,7 +139,7 @@ These scripts evaluate:
 <h3>Density Recovery (Univariate)</h3>
 <figure>
 <p align="center">
-<img src="figures/comparisonnnnn.png" width="85%">
+<img src="figures/comparisonnnnn.png" width="100%">
 </p>
 <figcaption align="center">
 <b>Figure 1:</b> Density recovery using ASG with effective support estimation.
@@ -149,7 +149,7 @@ These scripts evaluate:
 <h3>Rosenbrock Conditional Density</h3>
 <figure>
 <p align="center">
-<img src="figures/density_overlay.png" width="85%">
+<img src="figures/density_overlay.png" width="100%">
 </p>
 <figcaption align="center">
 <b>Figure 2:</b> Conditional density overlay for Rosenbrock kernel.
@@ -159,7 +159,7 @@ These scripts evaluate:
 <h3>Ackley Conditional Density</h3>
 <figure>
 <p align="center">
-<img src="figures/ackley_density.png" width="85%">
+<img src="figures/ackley_density.png" width="100%">
 </p>
 <figcaption align="center">
 <b>Figure 3:</b> Conditional density overlay for Ackley kernel.
@@ -171,7 +171,7 @@ These scripts evaluate:
 <h3>Time-Based Efficiency (ESS/s)</h3>
 <figure>
 <p align="center">
-<img src="figures/Time_fixed_sample_comparison.png" width="85%">
+<img src="figures/Time_fixed_sample_comparison.png" width="100%">
 </p>
 <figcaption align="center">
 <b>Figure 4:</b> Time-aware efficiency comparison (ESS/s).
@@ -181,7 +181,7 @@ These scripts evaluate:
 <h3>Sample-Based Efficiency (ESS/s)</h3>
 <figure>
 <p align="center">
-<img src="figures/sample_fixed_time_varied_plot_comparison.png" width="85%">
+<img src="figures/sample_fixed_time_varied_plot_comparison.png" width="100%">
 </p>
 <figcaption align="center">
 <b>Figure 5:</b> Sample-aware efficiency comparison (ESS/s).
