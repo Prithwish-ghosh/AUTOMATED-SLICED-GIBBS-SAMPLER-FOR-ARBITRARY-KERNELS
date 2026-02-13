@@ -1,10 +1,12 @@
 rm(list = ls())
+setwd("~/Downloads/ASG Sampler/code")
 source("effective_support_uni_s.R")
 source("asg_sampler.R")
 
 ## ------------------------------------------------------------------
 ## Example usage (kept minimal; reuse your kernels)
-## ------------------------------------------------------------------
+## ------------
+------------------------------------------------------
 
 # 1) Univariate mixture (as in your code)
 k1 <- function(theta) {
@@ -13,6 +15,21 @@ k1 <- function(theta) {
     0.3 * dbeta((theta[1] - 5) / 2, 1, 0.5) / 2
 }
 
+L_k1 <- function(theta) {
+  x <- theta[1]
+  dens <- 0.3 * dbeta((x + 5) / 2, 0.5, 1) / 2 +
+    0.4 * dbeta((x + 1) / 2, 2, 2) / 2 +
+    0.3 * dbeta((x - 5) / 2, 1, 0.5) / 2
+  if (dens <= 0 || !is.finite(dens)) {
+    return(Inf)  # outside support → infinite energy
+  } else {
+    return(-log(dens))
+  }
+}
+
+
+#effective.support(k1)
+
 # 2) Bivariate normal kernel (example)
 library(mvtnorm)
 bivariate_normal_ker <- function(theta, mean = c(0, 0),
@@ -20,8 +37,16 @@ bivariate_normal_ker <- function(theta, mean = c(0, 0),
   dmvnorm(theta, mean = mean, sigma = sigma)
 }
 
-# --- Run examples
+library(mvtnorm)
 
+bivariate_normal_L <- function(theta,
+                               mean = c(0, 0),
+                               sigma = matrix(c(1, 0.6, 0.6, 1), 2, 2)) {
+  # negative log-kernel
+  L <- -dmvnorm(theta, mean = mean, sigma = sigma, log = TRUE)
+  return(L)
+}
+# --- Run examples
 n_samples <- 1000
 burn_in <- 250
 thin <- 1
@@ -29,21 +54,23 @@ thin <- 1
 
 set.seed(123)
 # Univariate
-res_uni <- dim1_gibbs_sample_ASG(
-  ker = k1, n_samples = n_samples, burn_in = burn_in, thin = thin,
-  theta_init = c(0), tol = 0.01, scale0 = 1
+res_uni <- dim1_gibbs_sample_ASG(ker = k1, n_samples = n_samples, burn_in = burn_in, thin = thin,
+  theta_init = c(0), tol = 0.001, scale0 = 1
 )
 res_uni$time_taken
 library(coda)
 effectiveSize(res_uni$samples)
 mean(res_uni$samples)
+
+
+
 # Bivariate normal
-res_bvn <- multivariate_gibbs_sample_ASG(
-  ker = bivariate_normal_ker, n_samples = n_samples, burn_in = burn_in, thin = thin,
+res_bvn <- multivariate_gibbs_sample_ASG(bivariate_normal_ker, n_samples = n_samples, burn_in = burn_in, thin = thin,
   theta_init = c(0, 0), tol = 0.01, scale0 = 1
 )
 effectiveSize(res_bvn$samples)
-
+#plot_asg_diagnostics_scalar(res_bvn$samples,burn_in)
+res_bvn$chain
 
 ## ---- Parameters ------------------------------------------------------------
 mu    <- c(0, 0)
@@ -96,9 +123,23 @@ K_trivariate <- function(theta) {
     0.5 * dnorm(theta[1], mean = 1, sd = 1) * dnorm(theta[2], mean = 1, sd = 1) * dnorm(theta[3], mean = 1, sd = 1)
 }
 
-res_tri = multivariate_gibbs_sample_ASG(ker = K_trivariate, n_samples = n_samples, burn_in = burn_in, 
+L_trivariate <- function(theta) {
+  # two Gaussian components, equal weights
+  dens <- 0.5 * dnorm(theta[1], mean = 0, sd = 1) *
+    dnorm(theta[2], mean = 0, sd = 1) *
+    dnorm(theta[3], mean = 0, sd = 1) +
+    0.5 * dnorm(theta[1], mean = 1, sd = 1) *
+    dnorm(theta[2], mean = 1, sd = 1) *
+    dnorm(theta[3], mean = 1, sd = 1)
+  if (dens <= 0 || !is.finite(dens)) return(Inf)
+  -log(dens)
+}
+
+
+res_tri = multivariate_gibbs_sample_ASG(K_trivariate, n_samples = n_samples, burn_in = burn_in, 
                                         theta_init = c(0,0,0), tol = 0.01, scale0 = 1)
 
+#plot_asg_diagnostics_scalar(res_tri$samples,burn_in)
 res_tri$time_taken
 effectiveSize(res_tri$samples)
 mean(res_tri$samples[,1])
@@ -121,39 +162,12 @@ banana_kernel <- function(theta) {
   exp(log_pi)
 }
 
-# Example: Evaluate the kernel at a point
-theta <- c(0, 0)
-kernel_value <- banana_kernel(theta)
-cat("Kernel value at theta =", theta, ":", kernel_value, "\n")
-
-# Create a grid for x1 and x2
-x1_grid <- seq(-4, 4, length.out = 100)
-x2_grid <- seq(-2, 6, length.out = 100)
-
-# Compute the kernel values over the grid
-z <- matrix(NA, nrow = length(x1_grid), ncol = length(x2_grid))
-for (i in 1:length(x1_grid)) {
-  for (j in 1:length(x2_grid)) {
-    z[i, j] <- banana_kernel(c(x1_grid[i], x2_grid[j]))
-  }
+L_banana <- function(theta) {
+  x1 <- theta[1]
+  x2 <- theta[2]
+  # negative log-kernel (Banana / Rosenbrock type)
+  (x1^2) / 10 + (x2^2) / 10 + 2 * (x2 - x1^2)^2
 }
-
-#z
-
-# Create data frame for plotting
-grid_data <- expand.grid(x1 = x1_grid, x2 = x2_grid)
-grid_data$z <- as.vector(z)
-
-# Create contour plot
-p_banana <- ggplot(grid_data, aes(x = x1, y = x2, z = z)) +
-  geom_contour_filled(bins = 20, aes(fill = after_stat(level))) +
-  scale_fill_brewer(palette = "RdBu", direction = -1) +
-  geom_point(aes(x = 0, y = 0), color = "green", size = 3) +
-  annotate("text", x = 0, y = 0.5, label = "Mode (0, 0)", color = "green", size = 5) +
-  labs(title = "Contour Plot of Banana-Shaped Kernel", x = "x1", y = "x2") +
-  theme_minimal() +
-  theme(text = element_text(size = 20))
-p_banana
 
 result_banana = multivariate_gibbs_sample_ASG(banana_kernel, n_samples = n_samples,
                                           burn_in = burn_in, 
@@ -162,29 +176,85 @@ result_banana = multivariate_gibbs_sample_ASG(banana_kernel, n_samples = n_sampl
 effectiveSize(result_banana$samples)
 result_banana$time_taken
 
-## mode
-d1 <- density(result_banana$samples[,1])
-d2 <- density(result_banana$samples[,2])
-c(d1$x[which.max(d1$y)], d2$x[which.max(d2$y)])
 
-samps_banana <- as.data.frame(result_banana$samples)
-names(samps_banana) <- c("x1", "x2")  # ensure column names
+# Example: evaluate L and the corresponding kernel at a point
+theta <- c(0, 0)
+L_value <- L_banana(theta)
+kernel_value <- exp(-L_value)   # K(theta) = exp(-L(theta))
+cat("L(theta) at", paste(theta, collapse = ", "), "=", L_value, "\n")
+cat("Kernel value exp(-L) at", paste(theta, collapse = ", "), "=", kernel_value, "\n")
 
-p_banana_final <- p_banana +
-  geom_point(data = samps_banana, aes(x = x1, y = x2),
-             inherit.aes = FALSE,
-             color = "purple", alpha = 0.55, size = 0.8)
+# Create a grid for x1 and x2
+x1_grid <- seq(-4, 4, length.out = 100)
+x2_grid <- seq(-2, 6, length.out = 100)
 
-p_banana_final
+# Compute L and exp(-L) over the grid
+zL <- matrix(NA_real_, nrow = length(x1_grid), ncol = length(x2_grid))  # energy
+zK <- matrix(NA_real_, nrow = length(x1_grid), ncol = length(x2_grid))  # density
+
+for (i in seq_along(x1_grid)) {
+  for (j in seq_along(x2_grid)) {
+    Lij <- L_banana(c(x1_grid[i], x2_grid[j]))
+    zL[i, j] <- Lij
+    zK[i, j] <- exp(-Lij)
+  }
+}
+
+# Prepare data frames for plotting
+grid_data <- expand.grid(x1 = x1_grid, x2 = x2_grid)
+grid_data$L  <- as.vector(zL)
+grid_data$K  <- as.vector(zK)
 
 
+# 2) Contour plot of DENSITY (kernel = exp(-L))
+p_density <- ggplot(grid_data, aes(x = x1, y = x2, z = K)) +
+  geom_contour_filled(bins = 20, aes(fill = after_stat(level))) +
+  scale_fill_brewer(palette = "RdBu", direction = -1) +
+  geom_point(aes(x = 0, y = 0), color = "green", size = 3) +
+  annotate("text", x = 0, y = 0.5, label = "Mode (0, 0)", color = "green", size = 5) +
+  labs(title = "Banana Target: Density Contours (K = exp(-L))", x = "x1", y = "x2") +
+  theme_minimal() +
+  theme(text = element_text(size = 20))
 
+# Print plots
+#p_energy
+p_density
 
+## Assuming you already have:
+## - grid_data with columns x1, x2, K
+## - p_density defined as in your snippet
+## - sampler output in `res$samples` (n x 2 matrix)
 
+# 0) Put samples into a data.frame and name columns
+samps <- as.data.frame(result_banana$samples)
+if (ncol(samps) < 2) stop("Need at least two coordinates to overlay.")
+names(samps)[1:2] <- c("theta_1", "theta_2")
+
+# (Optional) show a short recent trajectory to visualize mixing
+path_n <- min(400, nrow(samps))
+path_df <- samps[(nrow(samps) - path_n + 1):nrow(samps), , drop = FALSE]
+
+# 1) Overlay samples on the existing density plot
+# Overlay only sample points (no connecting lines)
+p_density_overlay <- p_density +
+  geom_point(
+    data = samps,
+    aes(x = theta_1, y = theta_2),
+    inherit.aes = FALSE,
+    alpha = 1,   # transparency
+    color = "purple",
+    size = 0.8,     # point size
+    color = "black" # you can change to "white" or another color
+  ) +
+  coord_cartesian(
+    xlim = range(grid_data$x1, na.rm = TRUE),
+    ylim = range(grid_data$x2, na.rm = TRUE)
+  )
+
+# Plot it
+p_density_overlay
 
 # Ackley_function
-
-
 
 ackley_f <- function(theta, a = 20, b = 0.2, c = 2*pi) {
   if (is.null(dim(theta))) {
@@ -202,6 +272,23 @@ ackley_f <- function(theta, a = 20, b = 0.2, c = 2*pi) {
   f <- -a * exp(-b * sqrt(ss / d)) - exp(cos_mean) + a + exp(1)
   as.numeric(f)
 }
+
+# Negative log-kernel for the Ackley target
+L_ackley <- function(theta, a = 20, b = 0.2, c = 2*pi, temp = 1) {
+  f <- ackley_f(theta, a = a, b = b, c = c)  # your function above
+  f / temp
+}
+
+
+L_ackley <- function(theta, a = 20, b = 0.2, c = 2*pi, temp = 1) {
+  if (is.null(dim(theta))) theta <- matrix(theta, nrow = 1)
+  d  <- ncol(theta)
+  ss <- rowSums(theta^2)
+  cos_mean <- rowMeans(cos(c * theta))
+  f <- -a * exp(-b * sqrt(ss / d)) - exp(cos_mean) + a + exp(1)  # Ackley value ≥ 0
+  as.numeric(f / temp)
+}
+
 
 # Log-kernel: log π(θ) = - f(θ) / temp, with optional domain box constraint
 ackley_log_kernel <- function(theta, temp = 1, box = c(-32.768, 32.768)) {
@@ -223,6 +310,11 @@ ackley_kernel <- function(theta, temp = 1, box = c(-32.768, 32.768)) {
   exp(lk)
 }
 
+ackley_kernel <- compiler::cmpfun(ackley_kernel)
+ackley_log_kernel <- compiler::cmpfun(ackley_log_kernel)
+ackley_f <- compiler::cmpfun(ackley_f)
+
+
 # -------------------------------
 # Quick examples
 # -------------------------------
@@ -242,32 +334,14 @@ theta10 <- rnorm(10)
 ackley_f(theta10)
 ackley_log_kernel(theta10, temp = 2)
 
-# -------------------------------
-# (Optional) 2D visualization
-# -------------------------------
-# Pretty heatmap of -f (so brighter == higher kernel mass)
-if (requireNamespace("ggplot2", quietly = TRUE)) {
-  library(ggplot2)
-  xs <- seq(-10, 10, length.out = 400)
-  ys <- seq(-10, 10, length.out = 400)
-  grid <- expand.grid(x1 = xs, x2 = ys)
-  fvals <- ackley_f(as.matrix(grid))
-  grid$neg_f <- -fvals
-  
-  ggplot(grid, aes(x1, x2)) +
-    geom_raster(aes(fill = neg_f), interpolate = TRUE) +
-    geom_contour(aes(z = neg_f), color = "white", linewidth = 0.25, alpha = 0.6) +
-    scale_fill_viridis_c(name = "-f(x)") +
-    coord_fixed() +
-    labs(title = "Ackley (d=2): heatmap of -f (proxy for log-kernel)",
-         x = "x1", y = "x2") +
-    theme_minimal(base_size = 14) +
-    theme(panel.grid = element_blank())
-}
 
-result_ackley_2d = multivariate_gibbs_sample_ASG(ackley_kernel ,theta_init = c(0,0), n_samples = n_samples, 
-                                             burn_in = burn_in, thin = thin)
+
+result_ackley_2d = multivariate_gibbs_sample_ASG(ackley_kernel ,theta_init = rep(0,2), n_samples = 1000, 
+                                             burn_in = 250, thin = 1, tol = 0.01)
+
+
 effectiveSize(result_ackley_2d$samples)
+
 result_ackley_2d$time_taken
 library(ggplot2)
 
@@ -297,9 +371,7 @@ p <- p_bg +
   geom_point(data = samps, aes(x = x1, y = x2),
              inherit.aes = FALSE,
              color = "red", alpha = 0.55, size = 1)
-
 p
-
 ## mode
 d11 <- density(result_ackley_2d$samples[,1])
 d22 <- density(result_ackley_2d$samples[,2])
@@ -309,7 +381,7 @@ c(d11$x[which.max(d11$y)], d22$x[which.max(d22$y)])
 
 
 ## ===============================================================
-## LASSO Kernel Function with Coefficient Path Plot (Fixed Version)
+## LASSO Kernel Function with Coefficient Path Plot 
 ## ===============================================================
 
 # Required packages
@@ -317,99 +389,166 @@ library(glmnet)
 library(reshape2)   # replaces pivot_longer
 
 # ==========================================================
-# LASSO Kernel for d = 2  (β0, β1, β2)
+# LASSO Kernel for d = 8  (β0, β1, β2)
 # ==========================================================
 
-lasso_kernel <- (function() {
-  # Prepare data once (global inside closure)
-  dat <- mtcars
-  y   <- dat$mpg
-  X   <- cbind(hp = dat$hp, wt = dat$wt)
-  X   <- scale(X, center = TRUE, scale = TRUE)
-  N   <- length(y)
-  lambda <- 0.25
-  
-  # Return the actual kernel function: depends only on theta
+data("QuickStartExample")
+QuickStartExample_data = as.data.frame(QuickStartExample)
+make_lasso_kernel <- function(y, X, lambda = 1, sigma2 = 1.0, alpha = 0.5) {
+  N <- length(y)
   function(theta) {
     beta0 <- theta[1]
     beta  <- theta[-1]
-    rss   <- sum((y - beta0 - as.vector(X %*% beta))^2)
-    penalty <- lambda * sum(abs(beta))
-    exp(-(rss / (2 * N) + penalty))
+    N   <- length(y)
+    mu <- beta0 + as.vector(X %*% beta)
+    rss <- sum((y - mu)^2)
+    
+    # Negative log-likelihood (proportional)
+    neg_log_lik <- rss / (2 * sigma2)
+    
+    # Negative log-prior: LASSO = Laplace prior on beta (not beta0)
+    neg_log_prior <- N*lambda * sum(abs(beta)^alpha)
+    
+    # Unnormalized posterior ∝ exp(- (neg_log_lik + neg_log_prior))
+    exp(-(neg_log_lik + neg_log_prior))
   }
-})()
+}
+
+
+
+dat <- QuickStartExample_data
+y   <- QuickStartExample$y
+X   <- QuickStartExample$x
+#X = X[,-20]
+
+lambda_lasso_kernel <- function(theta, sigma2 = 0.1, alpha = 1) {
+  dat <- QuickStartExample_data
+  y   <- QuickStartExample$y
+  X   <- QuickStartExample$x
+  N   <- length(y)
+  
+  lambda <- exp(theta[1])          # <-- simple: enforce λ ≥ 0
+  beta0  <- theta[2]
+  beta   <- theta[-c(1,2)]
+  
+  mu  <- beta0 + as.vector(X %*% beta)
+  rss <- mean((y - mu)^2)
+  
+  neg_log_lik   <- rss / (2 * sigma2 )  # mild scaling
+  neg_log_prior <- N*lambda * mean(abs(beta^alpha))
+  
+   exp(-(neg_log_lik + neg_log_prior))
+
+}
+
+lambda_lasso_L <- function(theta, sigma2 = 1.0) {
+  dat <- QuickStartExample_data
+  y   <- QuickStartExample$y
+  X   <- QuickStartExample$x
+  N   <- length(y)
+  
+  lambda <- exp(theta[1])          # enforce λ ≥ 0
+  beta0  <- theta[2]
+  beta   <- theta[-c(1,2)]
+  
+  mu  <- beta0 + as.vector(X %*% beta)
+  rss <- mean((y - mu)^2)
+  
+  neg_log_lik   <- rss / (2 * sigma2)     # scaled negative log-likelihood
+  neg_log_prior <- N * lambda * mean(abs(beta))  # L1 penalty term
+  
+  L_value <- neg_log_lik + neg_log_prior  # total energy (−log kernel)
+  return(as.numeric(L_value))
+}
+
+
+lambda_lasso_L(rep(1,22))
+
+
+
+
+lasso_kernel <- make_lasso_kernel(y, X, lambda = 0.001, alpha = 0.1)
+lasso_kernel(rep(1,21))
 
 # ==========================================================
 # Example: test kernel call
 # ==========================================================
 set.seed(123)
-n_samples <- 10000
+n_samples <- 100000
 burn_in <- 2500
 thin <- 1
-theta_test <- c(25,-2, -3)
-print(lasso_kernel(theta_test))  # should return a positive scalar
 
-res_lasso = multivariate_gibbs_sample_ASG(lasso_kernel ,n_samples = n_samples, burn_in = burn_in, 
-                                          theta_init = c(0,0,0), tol = 0.01, scale0 = 1)
-
-res_lasso$time_taken
-# Recreate the data exactly as in your lasso_kernel closure
-dat <- mtcars
-y   <- dat$mpg
-X   <- cbind(hp = dat$hp, wt = dat$wt)
-X   <- scale(X, center = TRUE, scale = TRUE)
-
-lambda <- 0.25  # same penalty used in your kernel
-
-# Fit glmnet at fixed lambda (same objective form: (1/2N)*RSS + lambda*||beta||_1)
-fit_fixed <- glmnet(X, y, alpha = 1, intercept = TRUE, standardize = FALSE, lambda = lambda)
-coef_fixed <- as.numeric(coef(fit_fixed, s = lambda))
-beta0_glm  <- coef_fixed[1]
-beta1_glm  <- coef_fixed[2]
-beta2_glm  <- coef_fixed[3]
-
-# (Optional) cross-validated choice, if you want it:
-# cvfit <- cv.glmnet(X, y, alpha = 1, intercept = TRUE, standardize = FALSE)
-# coef_cv <- as.numeric(coef(cvfit, s = "lambda.min"))
-
-cat("GLMNET (fixed lambda) coefficients:\n",
-    sprintf("beta0 = %.3f, beta1 = %.3f, beta2 = %.3f\n", beta0_glm, beta1_glm, beta2_glm))
+res_lasso = multivariate_gibbs_sample_ASG(lasso_kernel ,theta_init = rep(0,21), n_samples, burn_in, tol = 0.1, scale0 = 1)
+dim(res_lasso$samples)
+hist((exp(res_lasso$samples[,1])))
 
 
-estimated_samples = c(mean(res_lasso$samples[,1]), mean(res_lasso$samples[,2]), mean(res_lasso$samples[,3]))
-estimated_samples
-effectiveSize(res_lasso$samples)
+mean(effectiveSize(res_lasso$samples))
 
+## --- Extract posterior samples ---
+S <- res_lasso$samples
+if (!is.data.frame(S)) S <- as.data.frame(S)
 
+# Ensure proper names
+colnames(S) <- paste0("beta_", 0:(ncol(S) - 1))
 
+## --- Posterior mode estimation using kernel density mode ---
+posterior_mode <- function(x) {
+  d <- density(x)     # smooth density
+  d$x[which.max(d$y)]              # mode = x at maximum density
+}
 
-#### Hinge Loss function ######
+modes <- sapply(S, posterior_mode)
+modes
+## --- Combine with LASSO coefficients for comparison ---
+lasso_est <- as.numeric(coef_fixed)  # converts sparse Matrix to numeric
+lasso_est
+names(lasso_est) <- rownames(coef_fixed)
+lasso_est
+
+# align by names if necessary
+posterior_df <- data.frame(
+  Parameter = colnames(S),
+  PosteriorMode = modes,
+  LassoEstimate = lasso_est
+)
+
+posterior_df
+
 
 
 library(ggplot2)
-set.seed(2)
+library(tidyr)
+library(dplyr)
 
-# --- symmetric toy data ---
-n <- 40
-x <- seq(-2, 2, length.out = n)
-y <- ifelse(x >= 0, 1, -1)
-x <- scale(x, center = TRUE, scale = TRUE)
+res_lasso$time_taken
+# Convert samples to data frame
+S <- as.data.frame(res_lasso$samples)
 
-# Hinge kernel (θ = (β0, β1))
-hinge_kernel_2d <- function(theta) {
-  beta0 <- theta[1]
-  beta1 <- theta[2]
-  margins <- y * (beta0 + beta1 * as.numeric(x))
-  loss <- sum(pmax(0, 1 - margins))
-  exp(-loss)
-}
+colnames(S) <- paste0("beta_", 0:(ncol(S) - 1))
 
-set.seed(123)
-n_samples <- 10000
-burn_in <- 2500
-thin <- 1
 
-res_hinge = multivariate_gibbs_sample_ASG(hinge_kernel_2d ,n_samples = n_samples, burn_in = burn_in, 
-                                          theta_init = c(0,0), tol = 0.01, scale0 = 1)
-res_hinge$time_taken
-effectiveSize(res_hinge$samples)
+# Convert to long format (serial order)
+longS <- S %>%
+  mutate(draw = row_number()) %>%
+  pivot_longer(-draw, names_to = "parameter", values_to = "value") %>%
+  mutate(parameter = factor(parameter, levels = paste0("beta_", 0:(ncol(S) - 1))))
+
+hist(res_lasso$samples[,3])
+
+# Plot posterior densities: 7 columns × 3 rows = 21 panels
+ggplot(longS, aes(x = value)) +
+  geom_density(fill = "skyblue", alpha = 0.5, linewidth = 0.7) +
+  geom_vline(xintercept = 0, linetype = 2, color = "red") +
+  facet_wrap(~ parameter, scales = "free", ncol = 7, nrow = 3) +
+  labs(
+    title = "Posterior Densities of LASSO Coefficients (β0–β20)",
+    x = "Coefficient value",
+    y = "Density",
+    subtitle = "Arranged serially (7×3 grid); dashed red line = 0"
+  ) +
+  theme_bw(base_size = 12)+
+  coord_cartesian(xlim = c(-2, 2))
+
+y_pred_asg <- X %*% posterior_df$PosteriorMode
+y_pred_lasso <- X %*% posterior_df$Parameter
