@@ -1,3 +1,9 @@
+rm(list = ls())
+library(coda)
+library(ggplot2)
+setwd("~/Downloads/ASG Sampler/code")
+source("effective_support_uni_s.R")
+source("asg_sampler.R")
 ## ============================================================
 ## Kernels (NOT log-kernels) from "C.5 Target Distributions"
 ## ============================================================
