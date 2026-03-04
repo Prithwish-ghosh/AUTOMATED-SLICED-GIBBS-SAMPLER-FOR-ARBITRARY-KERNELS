@@ -490,6 +490,83 @@ acf(theta[,1], main="ACF coord 1")
 effectiveSize(theta)
 
 
+### worst case scenario
+set.seed(123)
+
+## Log-kernel for vector theta
+lf_ackley_vec <- function(theta, a = 20, b = 0.2, c = 2*pi) {
+  -ackley_f(theta, a = a, b = b, c = c)
+}
+
+## Build a 1D conditional log-target for coordinate j
+make_cond_logtarget <- function(theta_current, j, a = 20, b = 0.2, c = 2*pi) {
+  force(theta_current); force(j)
+  function(xj) {
+    th <- theta_current
+    th[j] <- xj
+    lf_ackley_vec(th, a = a, b = b, c = c)
+  }
+}
+
+## ---- Gibbs qslice ----
+d <- 2
+n_draws <- 1000
+
+theta <- matrix(NA_real_, nrow = n_draws, ncol = d)
+theta[1, ] <- rep(0, d)
+
+nEvaluations <- 0L
+
+# Make exploration terrible
+R_global <- 0.05     # very tight global box (kills big moves)
+delta    <- 1e-6     # extremely tiny local proposal width (kills local moves)
+
+time_qslice_gibbs <- system.time(
+  for (i in 2:n_draws) {
+    th <- theta[i - 1, ]
+    
+    for (j in 1:d) {
+      
+      # conditional log-target at current th
+      logt_j <- make_cond_logtarget(th, j)
+      
+      # WORST pseudo: only propose inside [x - delta, x + delta],
+      # and also clip to a tiny global region [-R_global, R_global]
+      lo <- max(-R_global, th[j] - delta)
+      hi <- min( R_global, th[j] + delta)
+      
+      pseudo1d_bad <- list(
+        ld = function(x) dunif(x, min = lo, max = hi, log = TRUE),
+        q  = function(u) qunif(u, min = lo, max = hi)
+      )
+      
+      out <- slice_quantile(
+        x          = th[j],
+        log_target = logt_j,
+        pseudo     = pseudo1d_bad
+      )
+      
+      th[j] <- out$x
+      nEvaluations <- nEvaluations + out$nEvaluations
+    }
+    
+    theta[i, ] <- th
+  }
+)
+
+time_qslice_gibbs
+nEvaluations
+
+# Diagnostics: should show extremely slow decay / near-flat trace
+par(mfrow=c(2,2))
+plot(theta[,1], type="l", main="Trace: dim 1 (should be sticky)", xlab="iter", ylab="x1")
+plot(theta[,2], type="l", main="Trace: dim 2 (should be sticky)", xlab="iter", ylab="x2")
+acf(theta[,1], main="ACF dim 1 (slow decay expected)")
+acf(theta[,2], main="ACF dim 2 (slow decay expected)")
+par(mfrow=c(1,1))
+
+effectiveSize(theta)
+
 ##### Banana Kernel ########
 
 ############################################################
@@ -608,4 +685,170 @@ plot(
   main = "Banana-shaped Rosenbrock density (qslice samples)"
 )
 
+####### Elliptical Slice ###
 
+## Supporting normal N(mu, Sig) for elliptical slice
+mu_k1  <- 0
+Sig_k1 <- matrix(25, nrow = 1, ncol = 1)  # variance = 25 (sd = 5)
+
+n_iter <- 1000
+draws_k1_ess <- numeric(n_iter)
+draws_k1_ess[1] <- 0
+nEvaluations <- 0L
+
+time_ess_k1 <- system.time(
+  for (i in 2:n_iter) {
+    out <- slice_elliptical_mv(
+      x          = draws_k1_ess[i - 1],  # scalar current state
+      log_target = lf_k1,
+      mu         = mu_k1,
+      Sig        = Sig_k1,
+      is_chol    = FALSE
+    )
+    draws_k1_ess[i] <- out$x
+    nEvaluations <- nEvaluations + out$nEvaluations
+  }
+)
+
+time_ess_k1
+effectiveSize(draws_k1_ess)
+mean(draws_k1_ess)
+
+
+### Banana Kerel
+
+set.seed(123)
+
+n_iter <- 1000
+draws_banana_ess <- matrix(0, nrow = n_iter, ncol = 2)
+draws_banana_ess[1, ] <- c(0, 0)
+nEvaluations <- 0L
+
+## Supporting normal N(mu, Sig)
+mu_banana  <- c(0, 0)
+Sig_banana <- diag(2)   # you can change this covariance if you want
+
+time_ess_banana <- system.time(
+  for (i in 2:n_iter) {
+    out <- slice_elliptical_mv(
+      x          = draws_banana_ess[i - 1, ],
+      log_target = banana_log_kernel,  # <-- log-kernel directly
+      mu         = mu_banana,
+      Sig        = Sig_banana,
+      is_chol    = FALSE
+    )
+    draws_banana_ess[i, ] <- out$x
+    nEvaluations <- nEvaluations + out$nEvaluations
+  }
+)
+
+effectiveSize(draws_banana_ess)
+time_ess_banana
+
+
+# Ackley Kernel
+
+ackley_f <- function(theta, a = 20, b = 0.2, c = 2*pi) {
+  if (is.null(dim(theta))) {
+    theta <- matrix(theta, nrow = 1)
+  }
+  d <- ncol(theta)
+  ss <- rowSums(theta^2)
+  cos_mean <- rowMeans(cos(c * theta))
+  f <- -a * exp(-b * sqrt(ss / d)) - exp(cos_mean) + a + exp(1)
+  as.numeric(f)
+}
+
+## ---------------------------------------------------------
+## Define a LOG-KERNEL from Ackley energy:
+## target kernel p(x) ∝ exp( - ackley_f(x) )
+ackley_log_kernel <- function(theta, a = 20, b = 0.2, c = 2*pi) {
+  theta <- as.numeric(theta)
+  -ackley_f(theta, a = a, b = b, c = c)
+}
+
+
+set.seed(123)
+
+D <- 2                 # choose dimension
+n_iter <- 1000
+
+draws_ackley_ess <- matrix(0, nrow = n_iter, ncol = D)
+draws_ackley_ess[1, ] <- rep(0, D)
+nEvaluations <- 0L
+
+## Supporting normal N(mu, Sig)
+mu_ackley  <- rep(0, D)
+Sig_ackley <- diag(D)   # you can change scale if you want
+
+time_ess_ackley <- system.time(
+  for (i in 2:n_iter) {
+    out <- slice_elliptical_mv(
+      x          = draws_ackley_ess[i - 1, ],
+      log_target = function(x) ackley_log_kernel(x, a = 20, b = 0.2, c = 2*pi),
+      mu         = mu_ackley,
+      Sig        = Sig_ackley,
+      is_chol    = FALSE
+    )
+    draws_ackley_ess[i, ] <- out$x
+    nEvaluations <- nEvaluations + out$nEvaluations
+  }
+)
+
+D <- 2                 # choose dimension
+n_iter <- 1000
+
+draws_ackley_ess <- matrix(0, nrow = n_iter, ncol = D)
+draws_ackley_ess[1, ] <- rep(0, D)
+nEvaluations <- 0L
+
+## Supporting normal N(mu, Sig)
+mu_ackley  <- rep(0, D)
+Sig_ackley <- diag(D)   # you can change scale if you want
+
+time_ess_ackley <- system.time(
+  for (i in 2:n_iter) {
+    out <- slice_elliptical_mv(
+      x          = draws_ackley_ess[i - 1, ],
+      log_target = function(x) ackley_log_kernel(x, a = 20, b = 0.2, c = 2*pi),
+      mu         = mu_ackley,
+      Sig        = Sig_ackley,
+      is_chol    = FALSE
+    )
+    draws_ackley_ess[i, ] <- out$x
+    nEvaluations <- nEvaluations + out$nEvaluations
+  }
+)
+
+effectiveSize(draws_ackley_ess)
+time_ess_ackley
+
+
+
+### Flaws
+
+D <- 2
+mu_ackley  <- c(50, -50)  
+
+rho <- 0.999999
+s1 <- 1
+s2 <- 1
+Sig_ackley <- matrix(c(s1^2,       rho*s1*s2,
+                       rho*s1*s2,  s2^2), nrow = 2, byrow = TRUE)
+
+
+time_ess_ackley_flaw <- system.time(
+  for (i in 2:n_iter) {
+    out <- slice_elliptical_mv(
+      x          = draws_ackley_ess[i - 1, ],
+      log_target = function(x) ackley_log_kernel(x, a = 20, b = 0.2, c = 2*pi),
+      mu         = mu_ackley,
+      Sig        = Sig_ackley,
+      is_chol    = FALSE
+    )
+    draws_ackley_ess[i, ] <- out$x
+    nEvaluations <- nEvaluations + out$nEvaluations
+  }
+)
+
+effectiveSize(draws_ackley_ess)
