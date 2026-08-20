@@ -3,7 +3,7 @@
 <h1>Automated Sliced Gibbs Sampler for Arbitrary Kernels</h1>
 
 <p>
-The arXiv version of the article can be found here.
+The arXiv version of the article can be found here -> https://doi.org/10.48550/arXiv.2603.29096
 </p>
 
 <blockquote>
