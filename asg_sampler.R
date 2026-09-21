@@ -132,7 +132,7 @@ multivariate_gibbs_sample_ASG <- function(ker, n_samples = 10, burn_in = 2, thin
         ker(tmp)
       }
     })(i)
-    bnds <- effective.support(g_i, tol = tol, scale0 = scale0)
+    bnds <- effective.support(g_i, tol = tol/m, scale0 = scale0)
     bounds_list[[i]] <- c(a = bnds$lower, b = bnds$upper)
     f_list[[i]] <- bnds$f         # normalized density over R (or approx support)
   }
