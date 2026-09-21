@@ -121,27 +121,12 @@ multivariate_gibbs_sample_ASG <- function(ker, n_samples = 10, burn_in = 2, thin
   colnames(theta_chain) <- paste0("theta_", seq_len(m))
   theta_new <- as.numeric(theta_init)
   
-  ## Precompute broad proposal boxes and a normalized 1D density (for overlay) for each coord at t=1
-  bounds_list <- vector("list", m)
-  f_list <- vector("list", m)
-  for (i in seq_len(m)) {
-    g_i <- (function(i) {
-      function(xi) {
-        tmp <- theta_new
-        tmp[i] <- xi
-        ker(tmp)
-      }
-    })(i)
-    bnds <- effective.support(g_i, tol = tol/m, scale0 = scale0)
-    bounds_list[[i]] <- c(a = bnds$lower, b = bnds$upper)
-    f_list[[i]] <- bnds$f         # normalized density over R (or approx support)
-  }
-  
-  ## Sampling
   for (t in seq_len(total_iter)) {
-    ## ONE u for the full sweep
+    
     u <- runif(1, 0, ker(theta_new))
+    
     for (i in seq_len(m)) {
+      
       g_i <- (function(i) {
         function(xi) {
           tmp <- theta_new
@@ -149,9 +134,26 @@ multivariate_gibbs_sample_ASG <- function(ker, n_samples = 10, burn_in = 2, thin
           ker(tmp)
         }
       })(i)
-      a_i <- bounds_list[[i]]["a"]; b_i <- bounds_list[[i]]["b"]
-      theta_new[i] <- slice1d_fixed_u(g_i, u, a = a_i, b = b_i)
+      
+      # Recompute support for CURRENT conditional
+      bnds <- effective.support(
+        g_i,
+        tol = tol/m,
+        scale0 = scale0
+      )
+      
+      a_i <- bnds$lower
+      b_i <- bnds$upper
+      
+      # Slice draw using current conditional and current bracket
+      theta_new[i] <- slice1d_fixed_u(
+        g_i,
+        u,
+        a = a_i,
+        b = b_i
+      )
     }
+    
     theta_chain[t, ] <- theta_new
   }
   
@@ -219,52 +221,52 @@ multivariate_gibbs_sample_ASG <- function(ker, n_samples = 10, burn_in = 2, thin
     print(p_trace)
     print(p_acf)
     print(p_rm)
-      
-      ## -----------------------------------------
-      ## Log-kernel diagnostics for appendix
-      ## log K(theta^(t)) from the full multivariate chain
-      ## -----------------------------------------
-      tiny <- 1e-300
-      logK_series <- apply(theta_chain, 1, function(th) {
-        val <- ker(as.numeric(th))
-        log(pmax(val, tiny))  # log K(x^{(t)})
-      })
-      
-      # Trace of log K(theta^{(t)})
-      df_logk_trace <- data.frame(
-        iter = seq_along(logK_series),
-        logK = logK_series
-      )
-      p_logk_trace <- ggplot(df_logk_trace, aes(x = iter, y = logK)) +
-        geom_line(alpha = 0.8, size = 2) +
-        geom_vline(xintercept = burn_in, linetype = "dashed", color = "red") +
-        labs(
-          title = "Trace of log-kernel: log K(theta^{(t)})",
-          x = "Iteration t",
-          y = "log K(theta)"
-        ) +
-        theme_minimal(base_size = 12)
-      
-      # ACF of log K(theta^{(t)}) (again, use post–burn-in part)
-      acf_logk <- acf(logK_series[(burn_in + 1L):length(logK_series)],
-                      plot = FALSE, lag.max = 50)
-      df_logk_acf <- data.frame(
-        lag = as.numeric(acf_logk$lag),
-        acf = as.numeric(acf_logk$acf)
-      )
-      p_logk_acf <- ggplot(df_logk_acf, aes(x = lag, y = acf)) +
-        geom_hline(yintercept = 0, size = 2) +
-        geom_segment(aes(xend = lag, yend = 0)) +
-        labs(
-          title = "ACF of log-kernel: log K(theta^{(t)})",
-          x = "Lag",
-          y = "ACF"
-        ) +
-        theme_minimal(base_size = 12)
-      
-      print(p_logk_trace)
-      print(p_logk_acf)
-    }
+    
+    ## -----------------------------------------
+    ## Log-kernel diagnostics for appendix
+    ## log K(theta^(t)) from the full multivariate chain
+    ## -----------------------------------------
+    tiny <- 1e-300
+    logK_series <- apply(theta_chain, 1, function(th) {
+      val <- ker(as.numeric(th))
+      log(pmax(val, tiny))  # log K(x^{(t)})
+    })
+    
+    # Trace of log K(theta^{(t)})
+    df_logk_trace <- data.frame(
+      iter = seq_along(logK_series),
+      logK = logK_series
+    )
+    p_logk_trace <- ggplot(df_logk_trace, aes(x = iter, y = logK)) +
+      geom_line(alpha = 0.8, size = 2) +
+      geom_vline(xintercept = burn_in, linetype = "dashed", color = "red") +
+      labs(
+        title = "Trace of log-kernel: log K(theta^{(t)})",
+        x = "Iteration t",
+        y = "log K(theta)"
+      ) +
+      theme_minimal(base_size = 12)
+    
+    # ACF of log K(theta^{(t)}) (again, use post–burn-in part)
+    acf_logk <- acf(logK_series[(burn_in + 1L):length(logK_series)],
+                    plot = FALSE, lag.max = 50)
+    df_logk_acf <- data.frame(
+      lag = as.numeric(acf_logk$lag),
+      acf = as.numeric(acf_logk$acf)
+    )
+    p_logk_acf <- ggplot(df_logk_acf, aes(x = lag, y = acf)) +
+      geom_hline(yintercept = 0, size = 2) +
+      geom_segment(aes(xend = lag, yend = 0)) +
+      labs(
+        title = "ACF of log-kernel: log K(theta^{(t)})",
+        x = "Lag",
+        y = "ACF"
+      ) +
+      theme_minimal(base_size = 12)
+    
+    print(p_logk_trace)
+    print(p_logk_acf)
+  }
   
   ## -----------------------------------------
   ## Return
