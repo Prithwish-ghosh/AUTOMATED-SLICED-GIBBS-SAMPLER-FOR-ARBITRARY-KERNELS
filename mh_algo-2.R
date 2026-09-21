@@ -1,5 +1,6 @@
 rm(list = ls())
 library(ggplot2)
+library(mcmcse)
 setwd("~/Downloads/ASG Sampler/code")
 source("mh_initials.R") 
 # Load required libraries
@@ -82,7 +83,7 @@ time_k_ackley <- system.time({
 })
 
 samples_k_ackley <- out_k_ackley$batch
-samples_k_ackley
+multiESS(samples_k_ackley)
 # Compute ESS and ACF
 ess_k_ackley <- effectiveSize(samples_k_ackley)
 ess_k_ackley
@@ -401,7 +402,8 @@ time_banana <- system.time({
 samples_banana <- out_banana$batch
 
 # Compute ESS and ACF
-ess_banana <- effectiveSize(samples_banana)
+ess_banana <- multiESS(samples_banana)
+ess_banana
 acf_banana <- acf(samples_banana, plot = FALSE)
 
 # Create grid for contour plot
