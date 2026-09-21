@@ -8,7 +8,7 @@ library(gridExtra)
 library(coda)
 
 source("effective_support_uni_s.R") 
-source("auto_code_multivariate.R")
+source("asg sampler.R")
 
 # Assumes these already exist in your session:
 #   - effective.support()
@@ -32,7 +32,7 @@ k1 <- function(theta) {
 }
 
 # Run YOUR sampler (univariate case: theta_init = c(0))
-res <- multivariate_gibbs_sample(
+res <- multivariate_gibbs_sample_ASG(
   ker        = k1,
   n_samples  = n_samples,
   burn_in    = burn_in,
@@ -49,7 +49,7 @@ b  <- es$upper
 f  <- es$f
 
 # How many first steps to overlay
-N_show <- 20  # switch to 10 for first 10 steps
+N_show <- 10  # switch to 10 for first 10 steps
 
 stopifnot(length(res$samples) >= N_show)
 steps_df <- data.frame(
@@ -67,14 +67,14 @@ p_trace_steps <- ggplot(steps_df, aes(Iter, Theta)) +
     x = "Iteration (post burn-in)", y = expression(theta)
   ) +
   theme_minimal(base_size = 13)
-
+p_trace_steps
 # ---------------- Panel B: Histogram backdrop + first N steps path -------------
 # Histogram uses density on y; we overlay (theta, f(theta)) so scales match
 all_df <- data.frame(Theta = res$samples)
 
 p_hist_path <- ggplot() +
   geom_histogram(data = all_df,
-                 aes(x = Theta, y = after_stat(density)),
+                 aes(x = theta_1, y = after_stat(density)),
                  bins = 60, fill = "grey85", color = "grey40") +
   # effective-support bounds
   geom_vline(xintercept = c(a, b), linetype = "dashed", color = "darkgreen") +
@@ -97,3 +97,4 @@ p_hist_path
 cat("ESS (effectiveSize):", round(effectiveSize(res$samples), 1), "\n")
 cat("Bounds [a,b]:", sprintf("[%.4f, %.4f]\n", a, b))
 cat(sprintf("Total time recorded by your sampler: %.2f sec\n", res$time_taken))
+
