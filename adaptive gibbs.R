@@ -1,7 +1,9 @@
 library(rhmc)
 library(qslice)
 library(mcmc)
+library(spBayes)
 library(coda)
+library(mcmcse)
 ## ----- Kernel: 3-component Beta mixture on R -----
 k1 <- function(theta) {
   0.3 * dbeta((theta + 5) / 2, 0.5, 1) / 2 +
@@ -42,10 +44,10 @@ time_hmc <- system.time(
 )
 
 time_hmc
-samples_univariate_case = hmc_out$chain[1,]
+samples_univariate_case = (hmc_out$chain[1,])
 
 acf(samples_univariate_case, lag.max = 50)
-effectiveSize(hmc_out$chain[1,])
+effectiveSize(samples_univariate_case)
 
 plot(hmc_out$chain[1,], type = "l", main = "Trace plot for k1", xlab = "Iteration", ylab = "Theta")
 
@@ -94,6 +96,18 @@ mode_x <- names(which.max(table(hmc_out$chain[1,])))
 mode_x
 mode_y <- names(which.max(table(hmc_out$chain[2,])))
 mode_y
+library(coda)
+
+library(coda)
+
+# Your HMC output: 1 x 1000
+hmc_chain <- as.matrix(hmc_out$chain)
+
+# Convert to iterations x parameters
+hmc_chain <- t(hmc_chain)
+
+# Multivariate ESS
+multiESS(hmc_chain)
 
 effectiveSize(hmc_out$chain[1,])
 effectiveSize(hmc_out$chain[2,])
@@ -138,6 +152,18 @@ mode_y <- names(which.max(table(hmc_out$chain[2,])))
 mode_y
 
 time_hmc_banana
+
+
+library(coda)
+
+# Your HMC output: 1 x 1000
+hmc_chain <- as.matrix(hmc_out$chain)
+
+# Convert to iterations x parameters
+hmc_chain <- t(hmc_chain)
+
+# Multivariate ESS
+multiESS(hmc_chain)
 
 effectiveSize(hmc_out$chain[1,])
 effectiveSize(hmc_out$chain[2,])
@@ -233,7 +259,7 @@ time_adap_gibbs_ackley <- system.time(
   ))
 
 acf(amg_out_ackley$p.theta.samples, lag.max = 50)
-effectiveSize(amg_out$p.theta.samples)
+multiESS(amg_out$p.theta.samples)
 
 time_adap_gibbs_ackley
 mean(amg_out$p.theta.samples)
@@ -339,7 +365,7 @@ cat("\nPosterior means (after burn-in):\n")
 print(colMeans(samps))
 
 cat("\nEffective Sample Sizes (after burn-in):\n")
-print(effectiveSize(as.mcmc(samps)))
+print(multiESS(as.mcmc(samps)))
 
 ## ---------------------------------------------------------
 ## 4. Diagnostics
@@ -445,7 +471,7 @@ make_cond_logtarget <- function(theta_current, j, a = 20, b = 0.2, c = 2*pi) {
 }
 
 ## Pseudo for each coordinate: Uniform(-R, R)
-R <- 10
+R <- 5
 pseudo1d <- list(
   ld = function(x) dunif(x, min = -R, max = R, log = TRUE),
   q  = function(u) qunif(u, min = -R, max = R)
@@ -487,7 +513,7 @@ nEvaluations
 plot(theta[,2], type="l", main="Ackley dD Gibbs-qSlice: coord 1 trace", ylab=expression(theta[1]))
 acf(theta[,1], main="ACF coord 1")
 
-effectiveSize(theta)
+multiESS(theta)
 
 
 ### worst case scenario
@@ -659,7 +685,7 @@ cat("Posterior means:\n")
 print(colMeans(theta))
 
 cat("Effective Sample Sizes:\n")
-print(effectiveSize(theta))
+print(multiESS(theta))
 
 ## ---------------------------------------------------------
 ## 5. Diagnostics
@@ -742,7 +768,7 @@ time_ess_banana <- system.time(
   }
 )
 
-effectiveSize(draws_banana_ess)
+multiESS(draws_banana_ess)
 time_ess_banana
 
 
@@ -820,7 +846,7 @@ time_ess_ackley <- system.time(
   }
 )
 
-effectiveSize(draws_ackley_ess)
+multiESS(draws_ackley_ess)
 time_ess_ackley
 
 
