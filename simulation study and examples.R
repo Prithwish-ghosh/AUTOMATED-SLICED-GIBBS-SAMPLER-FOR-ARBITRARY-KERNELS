@@ -552,3 +552,68 @@ ggplot(longS, aes(x = value)) +
 
 y_pred_asg <- X %*% posterior_df$PosteriorMode
 y_pred_lasso <- X %*% posterior_df$Parameter
+
+
+
+
+## Kernel: K(x) ∝ exp(-||x||), x ∈ R^m
+## Section 5.3 setup: m = 10, n_samples = 1000, burn_in = 200
+
+euclid_norm_kernel <- function(theta) {
+  exp(-sqrt(sum(theta^2)))
+}
+
+set.seed(123)
+
+m <- 10
+theta_init <- rep(0.1, m)   # avoid exact 0 (||x|| = 0 is fine here, but keep away from any edge cases)
+
+time_asg_euclid <- system.time(
+  asg_out_euclid <- multivariate_gibbs_sample_ASG(
+    ker        = euclid_norm_kernel,
+    n_samples  = 1000,
+    burn_in    = 200,
+    thin       = 1,
+    theta_init = theta_init,
+    tol        = 0.01,
+    scale0     = 1,
+    make_plots = FALSE
+  )
+)
+
+time_asg_euclid
+
+## ---------------------------------------------------------
+## Diagnostics matching the paper's Section 5.3 checks
+## ---------------------------------------------------------
+library(coda)
+
+theta_samples <- asg_out_euclid$samples   # n_samples x m matrix
+
+## Effective sample size per dimension (Table 7)
+ess_by_dim <- apply(theta_samples, 2, effectiveSize)
+print(ess_by_dim)
+
+## Multivariate ESS (single joint summary)
+mESS_euclid <- multiESS(theta_samples)
+mESS_euclid
+
+## Radial component r = ||x|| should follow Gamma(m, 1)
+r_samples <- sqrt(rowSums(theta_samples^2))
+
+## ACF of ||x|| (Figure 6a)
+acf(r_samples, lag.max = 100, main = "Autocorrelation of ||x||")
+
+## Empirical vs. theoretical Gamma(m, 1) density (Figure 6b)
+library(ggplot2)
+df_r <- data.frame(r = r_samples)
+xs <- seq(0, max(r_samples) * 1.1, length.out = 500)
+df_gamma <- data.frame(x = xs, dens = dgamma(xs, shape = m, rate = 1))
+
+ggplot() +
+  geom_histogram(data = df_r, aes(x = r, y = after_stat(density)),
+                  bins = 40, fill = "skyblue", color = "black", alpha = 0.7) +
+  geom_line(data = df_gamma, aes(x = x, y = dens), color = "red", linewidth = 1.2) +
+  labs(title = "Distribution of ||x|| vs Theoretical Gamma(m, 1)",
+       x = "r = ||x||", y = "Density") +
+  theme_minimal(base_size = 12)
