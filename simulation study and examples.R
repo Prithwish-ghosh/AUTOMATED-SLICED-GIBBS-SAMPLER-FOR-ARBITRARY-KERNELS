@@ -1,14 +1,14 @@
 rm(list = ls())
-setwd("~/Downloads/ASG Sampler/code")
 source("effective_support_uni_s.R")
 source("asg_sampler.R")
 
 ## ------------------------------------------------------------------
 ## Example usage (kept minimal; reuse your kernels)
 ## ------------
-------------------------------------------------------
-
+#------------------------------------------------------
+library(mcmcse)
 # 1) Univariate mixture (as in your code)
+
 k1 <- function(theta) {
   0.3 * dbeta((theta[1] + 5) / 2, 0.5, 1) / 2 +
     0.4 * dbeta((theta[1] + 1) / 2, 2, 2) / 2 +
@@ -28,24 +28,6 @@ L_k1 <- function(theta) {
 }
 
 
-#effective.support(k1)
-
-# 2) Bivariate normal kernel (example)
-library(mvtnorm)
-bivariate_normal_ker <- function(theta, mean = c(0, 0),
-                                 sigma = matrix(c(1, 0.6, 0.6, 1), 2, 2)) {
-  dmvnorm(theta, mean = mean, sigma = sigma)
-}
-
-library(mvtnorm)
-
-bivariate_normal_L <- function(theta,
-                               mean = c(0, 0),
-                               sigma = matrix(c(1, 0.6, 0.6, 1), 2, 2)) {
-  # negative log-kernel
-  L <- -dmvnorm(theta, mean = mean, sigma = sigma, log = TRUE)
-  return(L)
-}
 # --- Run examples
 n_samples <- 1000
 burn_in <- 250
@@ -55,96 +37,14 @@ thin <- 1
 set.seed(123)
 # Univariate
 res_uni <- dim1_gibbs_sample_ASG(ker = k1, n_samples = n_samples, burn_in = burn_in, thin = thin,
-  theta_init = c(0), tol = 0.001, scale0 = 1
+  theta_init = c(0), tol = 0.01, scale0 = 1
 )
 res_uni$time_taken
 library(coda)
-effectiveSize(res_uni$samples)
+mcmcse::multiESS(res_uni$samples)
 mean(res_uni$samples)
 
 
-
-# Bivariate normal
-res_bvn <- multivariate_gibbs_sample_ASG(bivariate_normal_ker, n_samples = n_samples, burn_in = burn_in, thin = thin,
-  theta_init = c(0, 0), tol = 0.01, scale0 = 1
-)
-effectiveSize(res_bvn$samples)
-#plot_asg_diagnostics_scalar(res_bvn$samples,burn_in)
-res_bvn$chain
-
-## ---- Parameters ------------------------------------------------------------
-mu    <- c(0, 0)
-Sigma <- matrix(c(1, 0.6, 0.6, 1), 2, 2)
-
-## ---- Grid for contours -----------------------------------------------------
-# Choose plotting window using marginal sds (wide enough to cover most mass)
-sd_x <- sqrt(Sigma[1, 1])
-sd_y <- sqrt(Sigma[2, 2])
-
-x_seq <- seq(mu[1] - 4 * sd_x, mu[1] + 4 * sd_x, length.out = 200)
-y_seq <- seq(mu[2] - 4 * sd_y, mu[2] + 4 * sd_y, length.out = 200)
-
-grid <- expand.grid(x = x_seq, y = y_seq)
-grid$density <- bivariate_normal_ker(cbind(grid$x, grid$y), mean = mu, sigma = Sigma)
-
-
-
-p <- ggplot() +
-  # Contour lines (True Kernel)
-  geom_contour(data = grid, aes(x = x, y = y, z = density, colour = "True Kernel"), bins = 12) +
-  # Samples (points)
-  geom_point(data = res_bvn$samples, aes(x = theta_1, y = theta_2, colour = "Samples"), size = 0.8, alpha = 0.5) +
-  coord_equal() +
-  labs(
-    title = "Bivariate Normal Kernel: Contours with Sample Overlay",
-    subtitle = sprintf("mean = (%.1f, %.1f),  Sigma = [[%.1f, %.1f],[%.1f, %.1f]]",
-                       mu[1], mu[2], Sigma[1,1], Sigma[1,2], Sigma[2,1], Sigma[2,2]),
-    x = expression(theta[1]),
-    y = expression(theta[2]),
-    colour = NULL
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    legend.position = c(0.85, 0.85),       # top-right corner
-    legend.background = element_rect(fill = "white", colour = "black", linewidth = 0.4),
-    legend.title = element_text(size = 10),
-    legend.text = element_text(size = 10)
-  ) +
-  scale_colour_manual(
-    values = c("True Kernel" = "darkblue", "Samples" = "red")
-  )
-
-print(p)
-
-# Trivariate
-# 3. Trivariate kernel (for testing)
-K_trivariate <- function(theta) {
-  0.5 * dnorm(theta[1], mean = 0, sd = 1) * dnorm(theta[2], mean = 0, sd = 1) * dnorm(theta[3], mean = 0, sd = 1) +
-    0.5 * dnorm(theta[1], mean = 1, sd = 1) * dnorm(theta[2], mean = 1, sd = 1) * dnorm(theta[3], mean = 1, sd = 1)
-}
-
-L_trivariate <- function(theta) {
-  # two Gaussian components, equal weights
-  dens <- 0.5 * dnorm(theta[1], mean = 0, sd = 1) *
-    dnorm(theta[2], mean = 0, sd = 1) *
-    dnorm(theta[3], mean = 0, sd = 1) +
-    0.5 * dnorm(theta[1], mean = 1, sd = 1) *
-    dnorm(theta[2], mean = 1, sd = 1) *
-    dnorm(theta[3], mean = 1, sd = 1)
-  if (dens <= 0 || !is.finite(dens)) return(Inf)
-  -log(dens)
-}
-
-
-res_tri = multivariate_gibbs_sample_ASG(K_trivariate, n_samples = n_samples, burn_in = burn_in, 
-                                        theta_init = c(0,0,0), tol = 0.01, scale0 = 1)
-
-#plot_asg_diagnostics_scalar(res_tri$samples,burn_in)
-res_tri$time_taken
-effectiveSize(res_tri$samples)
-mean(res_tri$samples[,1])
-mean(res_tri$samples[,2])
-mean(res_tri$samples[,3])
 
 # Banana
 
@@ -173,7 +73,7 @@ result_banana = multivariate_gibbs_sample_ASG(banana_kernel, n_samples = n_sampl
                                           burn_in = burn_in, 
                                           thin = thin, theta_init = c(0,0))
 #result_banana$samples
-effectiveSize(result_banana$samples)
+multiESS(result_banana$chain)
 result_banana$time_taken
 
 
@@ -334,13 +234,12 @@ theta10 <- rnorm(10)
 ackley_f(theta10)
 ackley_log_kernel(theta10, temp = 2)
 
-
-
 result_ackley_2d = multivariate_gibbs_sample_ASG(ackley_kernel ,theta_init = rep(0,2), n_samples = 1000, 
-                                             burn_in = 250, thin = 1, tol = 0.01)
+                                             burn_in = 250, thin = 1, tol = 0.1,make_plots = T)
 
-
-effectiveSize(result_ackley_2d$samples)
+result_ackley_2d$time_taken
+multiESS(result_ackley_2d$samples)
+multiESS(result_banana$chain)
 
 result_ackley_2d$time_taken
 library(ggplot2)
@@ -474,7 +373,7 @@ lasso_kernel(rep(1,21))
 # Example: test kernel call
 # ==========================================================
 set.seed(123)
-n_samples <- 100000
+n_samples <- 10000
 burn_in <- 2500
 thin <- 1
 
@@ -484,7 +383,7 @@ hist((exp(res_lasso$samples[,1])))
 
 
 mean(effectiveSize(res_lasso$samples))
-
+multiESS(res_lasso$samples)
 ## --- Extract posterior samples ---
 S <- res_lasso$samples
 if (!is.data.frame(S)) S <- as.data.frame(S)
@@ -500,20 +399,8 @@ posterior_mode <- function(x) {
 
 modes <- sapply(S, posterior_mode)
 modes
-## --- Combine with LASSO coefficients for comparison ---
-lasso_est <- as.numeric(coef_fixed)  # converts sparse Matrix to numeric
-lasso_est
-names(lasso_est) <- rownames(coef_fixed)
-lasso_est
 
-# align by names if necessary
-posterior_df <- data.frame(
-  Parameter = colnames(S),
-  PosteriorMode = modes,
-  LassoEstimate = lasso_est
-)
 
-posterior_df
 
 
 
@@ -555,6 +442,75 @@ y_pred_lasso <- X %*% posterior_df$Parameter
 
 
 
+###### Bridge ######
+## ===============================================================
+## Bridge Regression Kernel (generalized LASSO, alpha < 1)
+## Section 6.2: applies the generalized version of the lasso kernel
+## (make_lasso_kernel with alpha != 1) to the same QuickStartExample
+## dataset, with lambda = 0.001 and alpha = 0.1
+## ===============================================================
+
+# ==========================================================
+# Bridge Regression Kernel for d = 21  (beta0, beta1, ..., beta20)
+# ==========================================================
+
+data("QuickStartExample")
+QuickStartExample_data <- as.data.frame(QuickStartExample)
+
+dat <- QuickStartExample_data
+y   <- QuickStartExample$y
+X   <- QuickStartExample$x
+
+## Same kernel constructor as the LASSO case, alpha < 1 gives the
+## Bridge Regression penalty sum |beta_j|^alpha instead of the L1 norm
+bridge_kernel <- make_lasso_kernel(y, X, lambda = 0.001, alpha = 0.1)
+bridge_kernel(rep(1, 21))
+
+# ==========================================================
+# Sampling: same setup as Section 6.1, alpha = 0.1
+# ==========================================================
+set.seed(123)
+n_samples <- 10000
+burn_in   <- 2500
+thin      <- 1
+
+res_bridge <- multivariate_gibbs_sample_ASG(
+  bridge_kernel,
+  theta_init = rep(0, 21),
+  n_samples  = n_samples,
+  burn_in    = burn_in,
+  tol        = 0.1,
+  scale0     = 1
+)
+
+dim(res_bridge$samples)
+hist(res_bridge$samples[, 1])
+
+mean(effectiveSize(res_bridge$samples))
+multiESS(res_bridge$samples)
+
+## --- Extract posterior samples ---
+S_bridge <- res_bridge$samples
+if (!is.data.frame(S_bridge)) S_bridge <- as.data.frame(S_bridge)
+
+colnames(S_bridge) <- paste0("beta_", 0:(ncol(S_bridge) - 1))
+
+## --- Posterior mode estimation using kernel density mode ---
+posterior_mode <- function(x) {
+  d <- density(x)
+  d$x[which.max(d$y)]
+}
+
+modes_bridge <- sapply(S_bridge, posterior_mode)
+modes_bridge
+
+## --- 95% credible intervals, for the paper's Table 9 format ---
+ci_bridge <- sapply(S_bridge, quantile, probs = c(0.025, 0.975))
+ci_bridge
+
+
+
+####### f(x) = ||x||^2 function #######
 
 ## Kernel: K(x) ∝ exp(-||x||), x ∈ R^m
 ## Section 5.3 setup: m = 10, n_samples = 1000, burn_in = 200
@@ -593,7 +549,7 @@ theta_samples <- asg_out_euclid$samples   # n_samples x m matrix
 ## Effective sample size per dimension (Table 7)
 ess_by_dim <- apply(theta_samples, 2, effectiveSize)
 print(ess_by_dim)
-
+multiESS(theta_samples)
 ## Multivariate ESS (single joint summary)
 mESS_euclid <- multiESS(theta_samples)
 mESS_euclid
@@ -612,7 +568,7 @@ df_gamma <- data.frame(x = xs, dens = dgamma(xs, shape = m, rate = 1))
 
 ggplot() +
   geom_histogram(data = df_r, aes(x = r, y = after_stat(density)),
-                  bins = 40, fill = "skyblue", color = "black", alpha = 0.7) +
+                 bins = 40, fill = "skyblue", color = "black", alpha = 0.7) +
   geom_line(data = df_gamma, aes(x = x, y = dens), color = "red", linewidth = 1.2) +
   labs(title = "Distribution of ||x|| vs Theoretical Gamma(m, 1)",
        x = "r = ||x||", y = "Density") +
