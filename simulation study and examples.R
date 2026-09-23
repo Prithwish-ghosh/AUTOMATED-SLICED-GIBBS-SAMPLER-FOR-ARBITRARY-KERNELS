@@ -154,6 +154,48 @@ p_density_overlay <- p_density +
 # Plot it
 p_density_overlay
 
+## ------------------------------------------------------------------
+## Repeated-run wrapper: runs any sampler function R times with
+## different seeds, collects Multi ESS (and optionally timing), and
+## returns mean/sd -- ready to drop into any table.
+## ------------------------------------------------------------------
+run_replicated <- function(sampler_fn, kernel, theta_init, n_samples, burn_in,
+                            tol = 0.01, scale0 = 1, R = 10, base_seed = 1000,
+                            ess_fun = multiESS) {
+  ess_vals  <- numeric(R)
+  time_vals <- numeric(R)
+
+  for (r in seq_len(R)) {
+    set.seed(base_seed + r)
+    t0 <- Sys.time()
+    out <- sampler_fn(kernel, theta_init = theta_init,
+                       n_samples = n_samples, burn_in = burn_in,
+                       tol = tol, scale0 = scale0, make_plots = FALSE)
+    time_vals[r] <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+    ess_vals[r]  <- ess_fun(out$samples)
+  }
+
+  list(
+    ess_mean  = mean(ess_vals),  ess_sd  = sd(ess_vals),
+    time_mean = mean(time_vals), time_sd = sd(time_vals),
+    ess_raw   = ess_vals,        time_raw = time_vals
+  )
+}
+
+## Example: Rosenbrock, R = 10 replications
+res_rosenbrock_rep <- run_replicated(
+  sampler_fn = multivariate_gibbs_sample_ASG,
+  kernel     = banana_kernel,
+  theta_init = c(0, 0),
+  n_samples  = 1000,
+  burn_in    = 250,
+  R          = 10
+)
+
+sprintf("Multi ESS: %.1f (+/- %.1f)", res_rosenbrock_rep$ess_mean, res_rosenbrock_rep$ess_sd)
+
+
+
 # Ackley_function
 
 ackley_f <- function(theta, a = 20, b = 0.2, c = 2*pi) {
