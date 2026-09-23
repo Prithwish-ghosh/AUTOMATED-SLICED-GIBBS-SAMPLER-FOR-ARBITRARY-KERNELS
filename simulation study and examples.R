@@ -318,7 +318,144 @@ d11 <- density(result_ackley_2d$samples[,1])
 d22 <- density(result_ackley_2d$samples[,2])
 c(d11$x[which.max(d11$y)], d22$x[which.max(d22$y)])
 
+## =====================================================================
+## Replicated results for ALL kernels (append after everything already
+## defined above: k1, banana_kernel, ackley_kernel, lasso_kernel,
+## bridge_kernel, euclid_norm_kernel, dim1_gibbs_sample_ASG,
+## multivariate_gibbs_sample_ASG, and run_replicated() itself).
+##
+## R is scaled by cost: R = 10 for the cheap, low-dimensional kernels
+## (univariate, Rosenbrock, Ackley, Euclidean-norm -- all <=1000
+## samples, m <= 10); R = 3 for LASSO/Bridge (m = 21, 10,000 samples,
+## 2,500 burn-in -- roughly 10x the cost per run of everything else).
+## Raise LASSO/Bridge's R if your compute budget allows; state
+## whatever R you actually used explicitly in the paper.
+## =====================================================================
+## ------------------------------------------------------------------
+## Repeated-run wrapper: runs any sampler function R times with
+## different seeds, collects Multi ESS (and optionally timing), and
+## returns mean/sd -- ready to drop into any table.
+## ------------------------------------------------------------------
+run_replicated <- function(sampler_fn, kernel, theta_init, n_samples, burn_in,
+                           tol = 0.01, scale0 = 1, R = 10, base_seed = 1000,
+                           ess_fun = multiESS) {
+  ess_vals  <- numeric(R)
+  time_vals <- numeric(R)
+ 
+  for (r in seq_len(R)) {
+    set.seed(base_seed + r)
+    t0 <- Sys.time()
+    out <- sampler_fn(kernel, theta_init = theta_init,
+                      n_samples = n_samples, burn_in = burn_in,
+                      tol = tol, scale0 = scale0, make_plots = FALSE)
+    time_vals[r] <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+    ess_vals[r]  <- ess_fun(out$samples)
+  }
+ 
+  list(
+    ess_mean  = mean(ess_vals),  ess_sd  = sd(ess_vals),
+    time_mean = mean(time_vals), time_sd = sd(time_vals),
+    ess_raw   = ess_vals,        time_raw = time_vals
+  )
+}
 
+# 1) Univariate mixture (as in your code)
+
+k1 <- function(theta) {
+  0.3 * dbeta((theta[1] + 5) / 2, 0.5, 1) / 2 +
+    0.4 * dbeta((theta[1] + 1) / 2, 2, 2) / 2 +
+    0.3 * dbeta((theta[1] - 5) / 2, 1, 0.5) / 2
+}
+
+L_k1 <- function(theta) {
+  x <- theta[1]
+  dens <- 0.3 * dbeta((x + 5) / 2, 0.5, 1) / 2 +
+    0.4 * dbeta((x + 1) / 2, 2, 2) / 2 +
+    0.3 * dbeta((x - 5) / 2, 1, 0.5) / 2
+  if (dens <= 0 || !is.finite(dens)) {
+    return(Inf)  # outside support → infinite energy
+  } else {
+    return(-log(dens))
+  }
+}
+## Univariate ESS needs effectiveSize, not multiESS (p = 1)
+ess_univariate <- function(samples) as.numeric(effectiveSize(samples[, 1]))
+
+## ---------------------------------------------------------------
+## 1) Univariate (Beta mixture, m = 1)
+## ---------------------------------------------------------------
+res_uni_rep <- run_replicated(
+  sampler_fn = dim1_gibbs_sample_ASG,
+  kernel     = k1,
+  theta_init = c(0),
+  n_samples  = 1000,
+  burn_in    = 250,
+  tol        = 0.01,
+  scale0     = 1,
+  R          = 10,
+  ess_fun    = ess_univariate
+)
+sprintf("Univariate  -- ESS: %.1f (+/- %.1f)  |  time: %.4f (+/- %.4f)",
+        res_uni_rep$ess_mean, res_uni_rep$ess_sd,
+        res_uni_rep$time_mean, res_uni_rep$time_sd)
+
+
+## ---------------------------------------------------------------
+## 3) Ackley (m = 2)
+## ---------------------------------------------------------------
+
+
+# Negative log-kernel for the Ackley target
+L_ackley <- function(theta, a = 20, b = 0.2, c = 2*pi, temp = 1) {
+  f <- ackley_f(theta, a = a, b = b, c = c)  # your function above
+  f / temp
+}
+
+
+L_ackley <- function(theta, a = 20, b = 0.2, c = 2*pi, temp = 1) {
+  if (is.null(dim(theta))) theta <- matrix(theta, nrow = 1)
+  d  <- ncol(theta)
+  ss <- rowSums(theta^2)
+  cos_mean <- rowMeans(cos(c * theta))
+  f <- -a * exp(-b * sqrt(ss / d)) - exp(cos_mean) + a + exp(1)  # Ackley value ≥ 0
+  as.numeric(f / temp)
+}
+
+
+# Log-kernel: log π(θ) = - f(θ) / temp, with optional domain box constraint
+ackley_log_kernel <- function(theta, temp = 1, box = c(-32.768, 32.768)) {
+  if (is.null(dim(theta))) {
+    theta <- matrix(theta, nrow = 1)
+  }
+  # domain check (hypercube)
+  in_box <- apply(theta, 1, function(r) all(r >= box[1] & r <= box[2]))
+  logk <- -ackley_f(theta) / temp
+  logk[!in_box] <- -Inf
+  as.numeric(logk)
+}
+
+ackley_kernel <- function(theta, temp = 1, box = c(-32.768, 32.768)) {
+  lk <- ackley_log_kernel(theta, temp = temp, box = box)
+  exp(lk)
+}
+
+ackley_kernel <- compiler::cmpfun(ackley_kernel)
+ackley_log_kernel <- compiler::cmpfun(ackley_log_kernel)
+ackley_f <- compiler::cmpfun(ackley_f)
+
+res_ackley_rep <- run_replicated(
+  sampler_fn = multivariate_gibbs_sample_ASG,
+  kernel     = ackley_kernel,
+  theta_init = rep(0, 2),
+  n_samples  = 1000,
+  burn_in    = 250,
+  tol        = 0.1,
+  scale0     = 1,
+  R          = 10
+)
+sprintf("Ackley      -- ESS: %.1f (+/- %.1f)  |  time: %.4f (+/- %.4f)",
+        res_ackley_rep$ess_mean, res_ackley_rep$ess_sd,
+        res_ackley_rep$time_mean, res_ackley_rep$time_sd)
 
 
 ## ===============================================================
@@ -441,7 +578,8 @@ posterior_mode <- function(x) {
 
 modes <- sapply(S, posterior_mode)
 modes
-
+ci_bridge <- sapply(S, quantile, probs = c(0.025, 0.975))
+ ci_bridge
 
 
 
