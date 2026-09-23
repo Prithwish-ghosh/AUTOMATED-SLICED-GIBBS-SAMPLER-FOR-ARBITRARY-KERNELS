@@ -1,8 +1,5 @@
 library(coda)
 library(ggplot2)
-setwd("~/Downloads/ASG Sampler/code")
-source("effective_support_uni_s.R")
-source("asg_sampler.R")
 
 ## ----------------------------
 ## 1) TIME-BASED ASG sampler
