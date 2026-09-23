@@ -1,6 +1,6 @@
+library(mcmcse)
 # Proposed Method ##################
-rm(list = ls())
-source("time fixed function.R") 
+#source("time fixed function.R") 
 ############### Results #################################
 
 # Run the multivariate Gibbs sampler
@@ -63,10 +63,10 @@ df_mh_iter = c(length(result1_10_mh$samples),length(result1_20_mh$samples), leng
 
 
 
-proposed_data = data.frame("ESS/N" = df_proposed_ess_by_samples, "Log(N)" = log10(df_proposed_samples), "time" = c(10,20,30))
+proposed_data = data.frame("Multi ESS/N" = df_proposed_ess_by_samples, "Log(N)" = log10(df_proposed_samples), "time" = c(10,20,30))
 proposed_data
 
-MH_data = data.frame("ESS/N" = df_mh, "Log(N)" = log10(df_mh_iter), "time" = c(10,20,30))
+MH_data = data.frame("Multi ESS/N" = df_mh, "Log(N)" = log10(df_mh_iter), "time" = c(10,20,30))
 MH_data
 
 # Add an identifier column to each dataset
@@ -101,7 +101,7 @@ theta_init = c(0,0)
 
 result1_10_p_b <- multivariate_gibbs_sample_ASG_time(ker = banana_kernel,theta_init , duration_secs = 10)
 dim(result1_10_p_b$samples)
-ess_avg_b_10 = mean(effectiveSize(result1_10_p_b$samples[,1]), effectiveSize(result1_10_p_b$samples[,2]))
+ess_avg_b_10 = multiESS(result1_10_p_b$samples)
 
 result1_10_p_ess_b = ess_avg_b_10/length(result1_10_p_b$samples[,1])
 result1_10_p_ess_b
@@ -109,7 +109,7 @@ result1_10_p_ess_b
 #### 20 sec
 
 result1_20_p_b <- multivariate_gibbs_sample_ASG_time(ker = banana_kernel,theta_init , duration_secs = 20)
-ess_avg_b_20 = mean(effectiveSize(result1_20_p_b$samples[,1]), effectiveSize(result1_20_p_b$samples[,2]))
+ess_avg_b_20 = multiESS(result1_10_p_b$samples)
 
 result1_20_p_ess_b = ess_avg_b_20/length(result1_20_p_b$samples[,1])
 result1_20_p_ess_b
@@ -117,7 +117,7 @@ result1_20_p_ess_b
 ### 30 sec
 
 result1_30_p_b <- multivariate_gibbs_sample_ASG_time(ker = banana_kernel,theta_init , duration_secs = 30)
-ess_avg_b_30 = mean(effectiveSize(result1_30_p_b$samples[,1]), effectiveSize(result1_30_p_b$samples[,2]))
+ess_avg_b_30 = multiESS(result1_30_p_b$samples)
 
 result1_30_p_ess_b = ess_avg_b_30/length(result1_30_p_b$samples[,1])
 result1_30_p_ess_b
@@ -134,7 +134,7 @@ log_banana <- function(theta) {
 
 result1_10_mh_b <- mh_time(initial = theta_init, log_target = log_banana,run_time = 10)
 dim(result1_10_mh_b$samples)
-ess_avg_b_mh_10 = mean(effectiveSize(result1_10_mh_b$samples[,1]), effectiveSize(result1_10_mh_b$samples[,2]))
+ess_avg_b_mh_10 = multiESS(result1_10_mh_b$samples)
 
 result1_10_p_ess_b_mh = ess_avg_b_mh_10/length(result1_10_mh_b$samples[,1])
 result1_10_p_ess_b_mh
@@ -143,7 +143,7 @@ result1_10_p_ess_b_mh
 
 result1_20_mh_b <-  mh_time(initial = theta_init, log_target = log_banana ,run_time = 20)
 dim(result1_20_mh_b$samples)
-ess_avg_b_mh_20 = mean(effectiveSize(result1_20_mh_b$samples[,1]), effectiveSize(result1_20_mh_b$samples[,2]))
+ess_avg_b_mh_20 = multiESS(result1_20_mh_b$samples)
 
 result1_20_p_ess_b_mh = ess_avg_b_mh_20/length(result1_20_mh_b$samples[,1])
 result1_20_p_ess_b_mh
@@ -152,7 +152,7 @@ result1_20_p_ess_b_mh
 
 result1_30_mh_b <-  mh_time(initial = theta_init, log_target = log_banana ,run_time = 30)
 dim(result1_30_mh_b$samples)
-ess_avg_b_mh_30 = mean(effectiveSize(result1_30_mh_b$samples[,1]), effectiveSize(result1_30_mh_b$samples[,2]))
+ess_avg_b_mh_30 = multiESS(result1_30_mh_b$samples)
 
 result1_30_p_ess_b_mh = ess_avg_b_mh_30/length(result1_30_mh_b$samples[,1])
 result1_30_p_ess_b_mh
@@ -167,10 +167,10 @@ df_mh_iter_b = c(length(result1_10_mh_b$samples),length(result1_20_mh_b$samples)
 
 
 
-proposed_data_b = data.frame("ESS/N" = df_proposed_ess_by_samples_b, "Log(N)" = log10(df_proposed_samples_b), "time" = c(10,20,30))
+proposed_data_b = data.frame("Multi ESS/N" = df_proposed_ess_by_samples_b, "Log(N)" = log10(df_proposed_samples_b), "time" = c(10,20,30))
 proposed_data_b
 
-MH_data_b = data.frame("ESS/N" = df_mh_b, "Log(N)" = log10(df_mh_iter_b), "time" = c(10,20,30))
+MH_data_b = data.frame("Multi ESS/N" = df_mh_b, "Log(N)" = log10(df_mh_iter_b), "time" = c(10,20,30))
 MH_data_b
 
 # Add an identifier column to each dataset
@@ -184,7 +184,7 @@ all_data_b$kernel = "Rosenbrock Kernel"
 
 
 all_dataset = rbind(all_data, all_data_b)
-
+all_dataset
 
 
 
@@ -246,7 +246,7 @@ theta_init = c(0,0)
 
 result1_10_p_a <- multivariate_gibbs_sample_ASG_time(ker = ackley_kernel,theta_init , duration_secs = 10)
 dim(result1_10_p_a$samples)
-ess_avg_a_10 = mean(effectiveSize(result1_10_p_a$samples[,1]), effectiveSize(result1_10_p_a$samples[,2]))
+ess_avg_a_10 = multiESS(result1_10_p_a$samples)
 
 result1_10_p_ess_a = ess_avg_a_10/length(result1_10_p_a$samples[,1])
 result1_10_p_ess_a
@@ -254,7 +254,7 @@ result1_10_p_ess_a
 #### 20 sec
 
 result1_20_p_a <- multivariate_gibbs_sample_ASG_time(ker = ackley_kernel,theta_init , duration_secs = 20)
-ess_avg_a_20 = mean(effectiveSize(result1_20_p_a$samples[,1]), effectiveSize(result1_20_p_a$samples[,2]))
+ess_avg_a_20 = multiESS(result1_20_p_a$samples)
 
 result1_20_p_ess_a = ess_avg_a_20/length(result1_20_p_a$samples[,1])
 result1_20_p_ess_a
@@ -262,7 +262,7 @@ result1_20_p_ess_a
 ### 30 sec
 
 result1_30_p_a <- multivariate_gibbs_sample_ASG_time(ker = ackley_kernel,theta_init , duration_secs = 30)
-ess_avg_a_30 = mean(effectiveSize(result1_30_p_a$samples[,1]), effectiveSize(result1_30_p_a$samples[,2]))
+ess_avg_a_30 = multiESS(result1_30_p_a$samples)
 
 result1_30_p_ess_a = ess_avg_a_30/length(result1_30_p_a$samples[,1])
 result1_30_p_ess_a
@@ -272,7 +272,7 @@ result1_30_p_ess_a
 
 result1_10_mh_a <- mh_time(initial = theta_init, log_target = ackley_log_kernel,run_time = 10)
 dim(result1_10_mh_a$samples)
-ess_avg_a_mh_10 = mean(effectiveSize(result1_10_mh_a$samples[,1]), effectiveSize(result1_10_mh_a$samples[,2]))
+ess_avg_a_mh_10 = multiESS(result1_10_mh_a$samples)
 
 result1_10_p_ess_a_mh = ess_avg_a_mh_10/length(result1_10_mh_a$samples[,1])
 result1_10_p_ess_a_mh
@@ -281,7 +281,7 @@ result1_10_p_ess_a_mh
 
 result1_20_mh_a <-  mh_time(initial = theta_init, log_target = ackley_log_kernel ,run_time = 20)
 dim(result1_20_mh_a$samples)
-ess_avg_a_mh_20 = mean(effectiveSize(result1_20_mh_a$samples[,1]), effectiveSize(result1_20_mh_a$samples[,2]))
+ess_avg_a_mh_20 = multiESS(result1_20_mh_a$samples)
 
 result1_20_p_ess_a_mh = ess_avg_a_mh_20/length(result1_20_mh_a$samples[,1])
 result1_20_p_ess_a_mh
@@ -290,7 +290,7 @@ result1_20_p_ess_a_mh
 
 result1_30_mh_a <-  mh_time(initial = theta_init, log_target = ackley_log_kernel ,run_time = 30)
 dim(result1_30_mh_a$samples)
-ess_avg_a_mh_30 = mean(effectiveSize(result1_30_mh_a$samples[,1]), effectiveSize(result1_30_mh_a$samples[,2]))
+ess_avg_a_mh_30 = multiESS(result1_30_mh_a$samples)
 
 result1_30_p_ess_a_mh = ess_avg_a_mh_30/length(result1_30_mh_a$samples[,1])
 result1_30_p_ess_a_mh
@@ -305,10 +305,10 @@ df_mh_iter_a = c(length(result1_10_mh_a$samples),length(result1_20_mh_a$samples)
 
 
 
-proposed_data_a = data.frame("ESS/N" = df_proposed_ess_by_samples_a, "Log(N)" = log10(df_proposed_samples_a), "time" = c(10,20,30))
+proposed_data_a = data.frame("Multi ESS/N" = df_proposed_ess_by_samples_a, "Log(N)" = log10(df_proposed_samples_a), "time" = c(10,20,30))
 proposed_data_a
 
-MH_data_a = data.frame("ESS/N" = df_mh_a, "Log(N)" = log10(df_mh_iter_a), "time" = c(10,20,30))
+MH_data_a = data.frame("Multi ESS/N" = df_mh_a, "Log(N)" = log10(df_mh_iter_a), "time" = c(10,20,30))
 MH_data_a
 
 # Add an identifier column to each dataset
@@ -329,7 +329,7 @@ all_dataset_final
 
 ggplot(all_dataset_final,
        aes(x = Log.N.,
-           y = ESS.N,
+           y = Multi.ESS.N,
            color = Method,
            shape = factor(time),
            linetype = kernel)) +
@@ -337,9 +337,32 @@ ggplot(all_dataset_final,
   geom_line(aes(group = interaction(Method, kernel)), linewidth = 1) +
   labs(
     x = "Log10(N)",
-    y = "ESS/N",
+    y = "Multi ESS",
     shape = "Time (s)",
     color = "Method",
     linetype = "Kernel"
   ) +
+  theme_minimal(base_size = 14)
+
+
+
+## Recover N, ESS and ESS per second from the time-fixed results
+all_dataset_final$N           <- 10^all_dataset_final$Log.N.
+all_dataset_final$ESS         <- all_dataset_final$Multi.ESS.N * all_dataset_final$N
+all_dataset_final$ESS_per_sec <- all_dataset_final$ESS / all_dataset_final$time
+
+## ESS per second (time fixed)
+ggplot(all_dataset_final,
+       aes(x = factor(time), y = ESS_per_sec, fill = Method)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ kernel, scales = "free_y") +
+  labs(x = "Run time (seconds)", y = "ESS per second") +
+  theme_minimal(base_size = 14)
+
+## ESS/N (time fixed), same bar layout
+ggplot(all_dataset_final,
+       aes(x = factor(time), y = Multi.ESS.N, fill = Method)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ kernel, scales = "free_y") +
+  labs(x = "Run time (seconds)", y = "Multi ESS / N") +
   theme_minimal(base_size = 14)
