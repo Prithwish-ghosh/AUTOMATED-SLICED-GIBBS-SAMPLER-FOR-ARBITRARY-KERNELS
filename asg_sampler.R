@@ -1,20 +1,126 @@
 ## ------------------------------------------------------------------
-## Multivariate ASG
+## Multivariate ASG  (kernel K on its natural scale -- no log kernel)
+##
+## Requires effective.support() from effective_support_uni_s.R.
+## slice1d_fixed_u() is NOT needed from that file any more: the
+## version used here is slice1d_fixed_u_x0() below.
+##
+## [MODIFIED] Optional supervisor check condition: check_bracket
+##   check_bracket = TRUE  -> bracket [a, b] = smallest and largest
+##       roots of K = u, found on the Cauchy scale v = F_C(x; scale0)
+##       by a fixed grid scan + bisection. Each endpoint satisfies
+##         K(a_out) <= u < K(a_in),  |a_in - a_out| < e   (same for b)
+##       and every grid point outside [a, b] has K <= u, so [a, b]
+##       contains ALL components of the slice S_u (under assumption
+##       A3: every slice component is wider than the grid spacing on
+##       the Cauchy scale). Outside ends are returned, and x0 is used
+##       only for the check a < x0 < b, never to anchor the search.
+##   check_bracket = FALSE -> original behaviour: bracket = effective-
+##       support box from effective.support() (no check).
+## In both cases x0 is RETAINED if it falls outside [a, b] or the
+## rejection step runs out of tries (Tierney retain rule), which keeps
+## the update exactly invariant.
 ## ------------------------------------------------------------------
+
+
+## [NEW] Supervisor's check condition: extreme roots of K = u.
+## g : conditional kernel (natural scale), u : slice height,
+## x0: current value (only checked, never used to search).
+extreme_roots_bracket <- function(g, u, x0, scale0 = 1, n_grid = 1000L,
+                                  e = 1e-8, max_refine = 40L) {
+  inside <- function(v) { val <- g(qcauchy(v, scale = scale0)); isTRUE(val > u) }
+  vs <- seq_len(n_grid) / (n_grid + 1)          # fixed grid on (0, 1)
+  
+  ## bisection keeping inside(v_in) = TRUE, inside(v_out) = FALSE;
+  ## returns the OUTSIDE end, so no slice mass is cut off
+  bisect_out <- function(v_out, v_in) {
+    while (abs(v_in - v_out) >= e) {
+      mid <- (v_in + v_out) / 2
+      if (inside(mid)) v_in <- mid else v_out <- mid
+    }
+    v_out
+  }
+  ## slice reaches beyond the outermost grid point: refine toward edge
+  refine_edge <- function(v_in, edge) {
+    for (j in seq_len(max_refine)) {
+      v_try <- edge + (v_in - edge) / 2
+      if (!inside(v_try)) return(list(v = bisect_out(v_try, v_in), capped = FALSE))
+      v_in <- v_try
+    }
+    list(v = v_in, capped = TRUE)
+  }
+  
+  kL <- NA_integer_                              # first grid point in slice
+  for (k in seq_along(vs)) if (inside(vs[k])) { kL <- k; break }
+  if (is.na(kL)) return(list(lower = NA_real_, upper = NA_real_, ok = FALSE))
+  kR <- kL                                       # last grid point in slice
+  for (k in rev(seq_along(vs))) if (inside(vs[k])) { kR <- k; break }
+  
+  capped <- FALSE
+  if (kL == 1L) { r <- refine_edge(vs[1], 0); a_v <- r$v; capped <- r$capped
+  } else a_v <- bisect_out(vs[kL - 1L], vs[kL])
+  if (kR == n_grid) { r <- refine_edge(vs[n_grid], 1); b_v <- r$v; capped <- capped || r$capped
+  } else b_v <- bisect_out(vs[kR + 1L], vs[kR])
+  
+  a <- qcauchy(a_v, scale = scale0); b <- qcauchy(b_v, scale = scale0)
+  list(lower = a, upper = b,
+       ok = is.finite(a) && is.finite(b) && (a < x0) && (x0 < b) && !capped)
+}
+
+
+## [NEW] Fixed-u 1D slice step with the retain rule (replaces
+## slice1d_fixed_u from effective_support_uni_s.R). Draws uniformly
+## in x on [a, b] until K > u. Keeps x0 if x0 is outside [a, b] or if
+## max_tries is exhausted (previously returned NULL and crashed).
+slice1d_fixed_u_x0 <- function(g, u, a, b, x0, max_tries = 100000L) {
+  if (!is.finite(a) || !is.finite(b) || x0 < a || x0 > b)
+    return(list(x = x0, retained = TRUE))
+  for (t in seq_len(max_tries)) {
+    x_new <- runif(1, a, b)
+    gx <- g(x_new)
+    if (is.finite(gx) && gx > u) return(list(x = x_new, retained = FALSE))
+  }
+  list(x = x0, retained = TRUE)
+}
+
+
+## [NEW] One coordinate update, with or without the check.
+asg_coordinate_update <- function(g, u, x0, check_bracket, box = NULL,
+                                  tol = 0.01, scale0 = 1,
+                                  n_grid = 1000L, bisect_e = 1e-8) {
+  if (check_bracket) {
+    br <- extreme_roots_bracket(g, u, x0, scale0 = scale0,
+                                n_grid = n_grid, e = bisect_e)
+    if (!br$ok) return(list(x = x0, retained = TRUE))
+    a <- br$lower; b <- br$upper
+  } else {
+    if (is.null(box)) box <- effective.support(g, tol = tol, scale0 = scale0)
+    a <- box$lower; b <- box$upper
+  }
+  slice1d_fixed_u_x0(g, u, a, b, x0)
+}
+
+
 
 dim1_gibbs_sample_ASG <- function(ker, n_samples = 10 , burn_in = 2, thin = 1,
                                   theta_init, tol = 0.01, scale0 = 1,
+                                  bisect_e = 1e-8,
+                                  check_bracket = TRUE,   # [MODIFIED] option
+                                  n_grid = 1000L,         # [MODIFIED] grid size for check
                                   make_plots = TRUE) {
   start_time <- Sys.time()
   m <- 1
+  n_retained <- 0L                                        # [MODIFIED]
   total_iter <- burn_in + n_samples * thin
   theta_chain <- matrix(NA_real_, nrow = total_iter, ncol = m)
   colnames(theta_chain) <- paste0("theta_", seq_len(m))
   theta_new <- as.numeric(theta_init)
   
-  ## Precompute broad proposal boxes and a normalized 1D density (for overlay) for each coord at t=1
-  bounds_list <- vector("list", m)
-  f_list <- vector("list", m)
+  ## [MODIFIED comment] effective.support() is called ONCE here (m = 1):
+  ## its box is the sampling bracket when check_bracket = FALSE, and its
+  ## density f is the overlay in the diagnostic plots in both cases.
+  bounds_list <- vector("list", m)   # box (used when check_bracket = FALSE)
+  f_list <- vector("list", m)        # density overlay for the plots
   for (i in seq_len(m)) {
     g_i <- (function(i) {
       function(xi) {
@@ -40,8 +146,19 @@ dim1_gibbs_sample_ASG <- function(ker, n_samples = 10 , burn_in = 2, thin = 1,
           ker(tmp)
         }
       })(i)
-      a_i <- bounds_list[[i]]["a"]; b_i <- bounds_list[[i]]["b"]
-      theta_new[i] <- slice1d_fixed_u(g_i, u, a = a_i, b = b_i)
+      
+      ## ---- [MODIFIED] check_bracket = TRUE: extreme roots of K = u
+      ## (supervisor's check). check_bracket = FALSE: the fixed
+      ## effective-support box computed once above (m = 1, so the
+      ## conditional kernel never changes). ----
+      box_i <- list(lower = unname(bounds_list[[i]]["a"]),
+                    upper = unname(bounds_list[[i]]["b"]))
+      upd <- asg_coordinate_update(g_i, u, theta_new[i],
+                                   check_bracket = check_bracket, box = box_i,
+                                   tol = tol / m, scale0 = scale0,
+                                   n_grid = n_grid, bisect_e = bisect_e)
+      theta_new[i] <- upd$x
+      n_retained <- n_retained + upd$retained
     }
     theta_chain[t, ] <- theta_new
   }
@@ -107,16 +224,20 @@ dim1_gibbs_sample_ASG <- function(ker, n_samples = 10 , burn_in = 2, thin = 1,
     }
   }
   list(samples = theta_samples, chain = theta_chain,
-       burn_in = burn_in, thin = thin, time_taken = time_taken)
+       burn_in = burn_in, thin = thin, time_taken = time_taken,
+       retain_rate = n_retained / (total_iter * m))    # [MODIFIED]
 }
 
 
 multivariate_gibbs_sample_ASG <- function(ker, n_samples = 10, burn_in = 2, thin = 1,
                                           theta_init, tol = 0.01, scale0 = 1,
-                                          max_shrinks = 200L, tol_floor = 1e-8,
+                                          bisect_e = 1e-8,
+                                          check_bracket = F,   # [MODIFIED] option
+                                          n_grid = 1000L,         # [MODIFIED] grid size for check
                                           make_plots = TRUE) {
   start_time <- Sys.time()
   m <- length(theta_init)
+  n_retained <- 0L                                                # [MODIFIED]
   total_iter <- burn_in + n_samples * thin
   theta_chain <- matrix(NA_real_, nrow = total_iter, ncol = m)
   colnames(theta_chain) <- paste0("theta_", seq_len(m))
@@ -136,37 +257,16 @@ multivariate_gibbs_sample_ASG <- function(ker, n_samples = 10, burn_in = 2, thin
         }
       })(i)
       
-      ## ---- Box validity check, re-run at EVERY (t, i) since u and
-      ## ---- g_i both change every sweep -- a box validated once
-      ## ---- gives no guarantee at any later sweep or coordinate. ----
-      tol_k <- tol / m
-      tol_used <- tol_k
-      valid <- FALSE
-      
-      for (k in 0:max_shrinks) {
-        bnds <- effective.support(g_i, tol = tol_k, scale0 = scale0)
-        a_i <- bnds$lower
-        b_i <- bnds$upper
-        tol_used <- tol_k
-        
-        ga <- g_i(a_i)
-        gb <- g_i(b_i)
-        
-        if (is.finite(ga) && is.finite(gb) && ga <= u && gb <= u) {
-          valid <- TRUE
-          break
-        }
-        
-        if (tol_k / 2 < tol_floor) {
-          warning(sprintf(
-            "t=%d, coord=%d: reached tol floor (%.1e) without validating the box; using widest box found (tol=%.2e).",
-            t, i, tol_floor, tol_used))
-          break
-        }
-        tol_k <- tol_k / 2
-      }
-      
-      theta_new[i] <- slice1d_fixed_u(g_i, u, a = a_i, b = b_i)
+      ## ---- [MODIFIED] check_bracket = TRUE: extreme roots of K = u
+      ## (supervisor's check; effective.support() is not called).
+      ## check_bracket = FALSE: effective-support box of the CURRENT
+      ## conditional, recomputed at every (t, i), with tolerance tol/m. ----
+      upd <- asg_coordinate_update(g_i, u, theta_new[i],
+                                   check_bracket = check_bracket,
+                                   tol = tol / m, scale0 = scale0,
+                                   n_grid = n_grid, bisect_e = bisect_e)
+      theta_new[i] <- upd$x
+      n_retained <- n_retained + upd$retained
     }
     
     theta_chain[t, ] <- theta_new
@@ -198,8 +298,7 @@ multivariate_gibbs_sample_ASG <- function(ker, n_samples = 10, burn_in = 2, thin
         x = "Iteration",
         y = series_name
       ) +
-      theme_minimal(base_size = 12) +
-      coord_cartesian(ylim = c(-8, 8))
+      theme_minimal(base_size = 12)   # [MODIFIED] removed hard-coded ylim c(-8, 8)
     
     # ACF plot (lag.max = 50)
     acf_vals <- acf(diag_series, plot = FALSE, lag.max = 50)
@@ -262,7 +361,7 @@ multivariate_gibbs_sample_ASG <- function(ker, n_samples = 10, burn_in = 2, thin
       ) +
       theme_minimal(base_size = 12)
     
-    # ACF of log K(theta^{(t)}) (again, use post–burn-in part)
+    # ACF of log K(theta^{(t)}) (again, use post-burn-in part)
     acf_logk <- acf(logK_series[(burn_in + 1L):length(logK_series)],
                     plot = FALSE, lag.max = 50)
     df_logk_acf <- data.frame(
@@ -291,6 +390,7 @@ multivariate_gibbs_sample_ASG <- function(ker, n_samples = 10, burn_in = 2, thin
     chain       = theta_chain,
     burn_in     = burn_in,
     thin        = thin,
-    time_taken  = time_taken
+    time_taken  = time_taken,
+    retain_rate = n_retained / (total_iter * m)   # [MODIFIED]
   )
 }
