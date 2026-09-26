@@ -113,6 +113,7 @@ dim1_gibbs_sample_ASG <- function(ker, n_samples = 10 , burn_in = 2, thin = 1,
 
 multivariate_gibbs_sample_ASG <- function(ker, n_samples = 10, burn_in = 2, thin = 1,
                                           theta_init, tol = 0.01, scale0 = 1,
+                                          max_shrinks = 200L, tol_floor = 1e-8,
                                           make_plots = TRUE) {
   start_time <- Sys.time()
   m <- length(theta_init)
@@ -123,11 +124,11 @@ multivariate_gibbs_sample_ASG <- function(ker, n_samples = 10, burn_in = 2, thin
   
   for (t in seq_len(total_iter)) {
     
-    u <- runif(1, 0, ker(theta_new))
+    u <- runif(1, 0, ker(theta_new))   ## fresh u -- every sweep
     
     for (i in seq_len(m)) {
       
-      g_i <- (function(i) {
+      g_i <- (function(i) {           ## fresh g_i -- every sweep, every coordinate
         function(xi) {
           tmp <- theta_new
           tmp[i] <- xi
@@ -135,23 +136,37 @@ multivariate_gibbs_sample_ASG <- function(ker, n_samples = 10, burn_in = 2, thin
         }
       })(i)
       
-      # Recompute support for CURRENT conditional
-      bnds <- effective.support(
-        g_i,
-        tol = tol/m,
-        scale0 = scale0
-      )
+      ## ---- Box validity check, re-run at EVERY (t, i) since u and
+      ## ---- g_i both change every sweep -- a box validated once
+      ## ---- gives no guarantee at any later sweep or coordinate. ----
+      tol_k <- tol / m
+      tol_used <- tol_k
+      valid <- FALSE
       
-      a_i <- bnds$lower
-      b_i <- bnds$upper
+      for (k in 0:max_shrinks) {
+        bnds <- effective.support(g_i, tol = tol_k, scale0 = scale0)
+        a_i <- bnds$lower
+        b_i <- bnds$upper
+        tol_used <- tol_k
+        
+        ga <- g_i(a_i)
+        gb <- g_i(b_i)
+        
+        if (is.finite(ga) && is.finite(gb) && ga <= u && gb <= u) {
+          valid <- TRUE
+          break
+        }
+        
+        if (tol_k / 2 < tol_floor) {
+          warning(sprintf(
+            "t=%d, coord=%d: reached tol floor (%.1e) without validating the box; using widest box found (tol=%.2e).",
+            t, i, tol_floor, tol_used))
+          break
+        }
+        tol_k <- tol_k / 2
+      }
       
-      # Slice draw using current conditional and current bracket
-      theta_new[i] <- slice1d_fixed_u(
-        g_i,
-        u,
-        a = a_i,
-        b = b_i
-      )
+      theta_new[i] <- slice1d_fixed_u(g_i, u, a = a_i, b = b_i)
     }
     
     theta_chain[t, ] <- theta_new
