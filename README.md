@@ -245,7 +245,242 @@ fit <- multivariate_gibbs_sample_ASG(ker, n_samples = 2000, burn_in = 200,
 
 ---
 
-## 6. Repository layout
+# ASG vs. AFSS vs. ESS: where coordinate-wise slice sampling wins
+
+This note documents two experiments comparing our Automated Sliced Gibbs
+(ASG) sampler against two established alternatives — the **Automated Factor
+Slice Sampler (AFSS)** and **Elliptical Slice Sampling (ESS)** — both run via
+their reference implementations in the `LaplacesDemon` R package, not
+reimplemented by hand. Both experiments target a **lattice of narrow,
+well-separated Gaussian modes**, which turns out to be exactly the shape of
+target that separates the three methods cleanly.
+
+All numbers below are taken directly from the two knitted R Markdown reports
+(`comparison-asg-afss-ess.html`, the dimension sweep; and
+`comparison-asg-afss-ess-grid-based.html`, the 2-D grid) and their attached
+figures — nothing here is hand-typed apart from labels.
+
+---
+
+## 6. The three samplers
+
+All three target an unnormalized kernel $K:\mathbb{R}^m\to[0,\infty)$,
+$p(x)=K(x)/Z$.
+
+### ASG (ours)
+
+Coordinate-wise Gibbs with a shared slice variable: draw
+$u\sim\mathrm{Unif}(0,K(x))$, then for $k=1,\dots,m$ draw
+
+$$
+x_k\sim\mathrm{Unif}\bigl(S_k(u)\bigr),\qquad
+S_k(u)=\{z\in\mathbb{R}:K(x_1,\dots,x_{k-1},z,x_{k+1},\dots,x_m)>u\}.
+$$
+
+Every update touches **exactly one coordinate**, holding the rest fixed.
+
+### ESS (Murray, Adams & MacKay, 2010)
+
+Introduces an auxiliary $\nu\sim N(0,\Sigma_{\text{aux}})$ and moves along a
+full ellipse through the current point:
+
+$$
+x(\theta)=x\cos\theta+\nu\sin\theta,\qquad \theta\in[0,2\pi).
+$$
+
+Because $N(x;0,\Sigma_{\text{aux}})\cdot\bigl[K(x)/N(x;0,\Sigma_{\text{aux}})\bigr]=K(x)$
+identically, this is exact for *any* $\Sigma_{\text{aux}}\succ0$ — the proposal
+is a **joint move across all $m$ coordinates at once**.
+
+### AFSS (Tibbits, Groendyke, Haran & Liechty, 2014)
+
+Estimates the target's covariance $\hat\Sigma$ (re-estimated periodically via
+eigendecomposition during an adaptive phase), then slice-samples along each
+eigenvector $e_k$ of $\hat\Sigma$ in turn using Neal's (2003) stepping-out +
+shrinkage 1-D slice sampler:
+
+$$
+x\leftarrow x+s\,e_k,\qquad s\sim\text{(univariate slice along } e_k\text{)}.
+$$
+
+Like ESS, each sweep is a small number of **fixed, data-driven linear
+directions** — not the coordinate axes, unless the estimated $\hat\Sigma$
+happens to be (close to) diagonal.
+
+---
+
+## 7. Experiment 1 — a 3×3 grid of modes (m = 2)
+
+**Kernel:** nine narrow, equally-weighted Gaussian bumps at every combination
+of $\{-6,0,6\}\times\{-6,0,6\}$:
+
+$$
+K(x_1,x_2)=\sum_{(c_1,c_2)\,\in\,\{-6,0,6\}^2}
+\exp\!\left(-\frac{(x_1-c_1)^2+(x_2-c_2)^2}{2\sigma^2}\right),
+\qquad \sigma=0.4.
+$$
+
+The population covariance of this target is **exactly diagonal** — $X_1$ and
+$X_2$ are independent, uniform over $\{-6,0,6\}$ — so the "correct" AFSS
+factor directions, in principle, are just the coordinate axes.
+
+**Settings:** $N=1500$ retained samples, $300$ burn-in, `theta_init = c(6,6)`
+(a mode). ESS given `Covar = diag(2)*36` (matched to the true 6-unit
+spacing). AFSS given the tutorial's own defaults.
+
+| method | modes visited |
+|---|---|
+| ASG-box | 9 / 9 |
+| ASG-grid | 9 / 9 |
+| ASG-adaptive | 9 / 9 |
+| LD-ESS | 9 / 9 |
+| LD-AFSS | **3 / 9** (one run's console log) — **6 / 9** in the attached figure (a separately executed run) |
+
+![3x3 grid comparison](figures/grid_kernel_comparison.png)
+
+At this dimension, **ESS is not yet a problem** — its fresh, randomly
+oriented ellipse each iteration is enough to occasionally land near any of
+the 9 bumps, wherever the current point is. **AFSS is already unreliable**:
+its two (adapted, not necessarily axis-aligned) factor directions connect
+only whichever subset of modes happens to lie along them, and that subset —
+3 modes in the console run, 6 in the plotted run — changes from run to run.
+ASG, sweeping the *literal* coordinate axes every time, reaches all 9 modes
+in every run.
+
+---
+
+## 8. Experiment 2 — the same idea, swept across dimension
+
+**Kernel:** the natural generalization to $m$ dimensions — $3^m$ narrow
+modes at every point of $\{-6,0,6\}^m$:
+
+$$
+K(x)=\sum_{c\,\in\,\{-6,0,6\}^m}\exp\!\left(-\frac{\lVert x-c\rVert^2}{2\sigma^2}\right),
+\qquad \sigma=0.4.
+$$
+
+**Settings:** $N=800$, burn-in $200$, `theta_init = rep(0.01, m)`, ESS given
+`Covar = diag(m)*36`, AFSS given the same defaults as above, for
+$m=2,3,4,5$ (i.e. $9,27,81,243$ modes).
+
+| $m$ | modes | ASG-adaptive | LD-AFSS | LD-ESS |
+|---|---|---|---|---|
+| 2 | 9 | **100.0%** | 11.1% | 100.0% |
+| 3 | 27 | **100.0%** | 3.7% | 74.1% |
+| 4 | 81 | **100.0%** | 1.2% | 16.0% |
+| 5 | 243 | **94.2%** | 3.7% | 4.1% |
+
+![dimension curse comparison](figures/dimension_curse_comparison.png)
+
+At $m=5$, ASG visits 229 of 243 modes; AFSS and ESS visit roughly 9 and 10
+respectively — both essentially stuck near their starting point.
+
+### multivariate ESS (effective sample size, not "modes visited") at m = 5
+
+Reported by `mcmcse::multiESS()` on the $m=5$ chains (800 retained draws
+each):
+
+| method | multiESS (out of 800) |
+|---|---|
+| ASG-adaptive | 800.0 |
+| LD-AFSS | 274.7 |
+| LD-ESS | 131.1 |
+
+Even setting aside how many *distinct modes* each chain found, the ASG chain
+is also the least autocorrelated of the three — consistent with a chain that
+is actually mixing, rather than one that is mostly revisiting the same small
+neighborhood.
+
+---
+
+## 9. Why this happens
+
+ASG's per-coordinate update is a genuinely **1-D** search: to move from one
+lattice point to any other, it needs at most $m$ coordinate updates, each
+just deciding which of 3 narrow slice pieces (along that one axis) to land
+in. The cost of navigating the lattice scales **linearly** in $m$.
+
+ESS and AFSS instead propose **joint** moves: a random rotation through all
+$m$ coordinates at once (ESS), or a fixed small set of linear combinations of
+them (AFSS). For either to relocate the chain to a *specific* one of $3^m$
+narrow modes, the proposal has to land within $\sim\sigma$ of that mode in
+**every coordinate simultaneously**. The probability of that happening by
+chance for a randomly oriented or fixed-direction proposal shrinks
+multiplicatively with $m$ — informally, something like
+$(\sigma/L)^{m}$ for a proposal spread of scale $L$, i.e. **exponential decay
+in $m$** — which is exactly the pattern in the table above: near-100% at
+$m=2$, collapsing by $m=5$.
+
+This is not a criticism of ESS or AFSS in general — both are designed for,
+and excel at, targets with smooth, roughly-elliptical or low-dimensional
+correlated structure, where their joint moves are a major advantage over
+coordinate-wise updates (see, e.g., the earlier `bimodal_diagonal`
+experiment in this repo, where both beat every ASG bracket badly). The
+lattice-of-modes kernel here is close to a worst case *for them* precisely
+because it has no such joint structure to exploit — it is exactly and only a
+per-coordinate multiple-choice problem, which is ASG's native format.
+
+---
+
+## 10. Reproducing this
+
+```r
+library(LaplacesDemon)
+library(mcmcse)
+source("effective_support_uni_s.R")
+source("level_set_endpoints.R")
+source("asg_sampler.R")
+
+set.seed(2026)
+vals <- c(-6, 0, 6); sigma <- 0.4
+m <- 5
+centers <- as.matrix(do.call(expand.grid, rep(list(vals), m)))
+K <- function(x) sum(exp(-rowSums((matrix(x, nrow(centers), m, byrow=TRUE) - centers)^2)/(2*sigma^2)))
+
+# ASG
+fit <- multivariate_gibbs_sample_ASG(K, n_samples = 800, burn_in = 200,
+                                      theta_init = rep(0.01, m), bracket = "adaptive")
+
+# LaplacesDemon AFSS / ESS
+Model <- function(parm, Data) {
+  LP <- log(K(parm)); if (!is.finite(LP)) LP <- -1e10
+  list(LP = LP, Dev = -2*LP, Monitor = LP, yhat = parm, parm = parm)
+}
+MyData <- list(mon.names = "LP", parm.names = paste0("x", 1:m))
+
+fit_afss <- LaplacesDemon(Model, Data = MyData, Initial.Values = rep(0.01, m),
+                          Covar = NULL, Iterations = 1000, Thinning = 1,
+                          Algorithm = "AFSS", Specs = list(A = 200, B = NULL, m = 100, n = 0, w = 1))
+
+fit_ess <- LaplacesDemon(Model, Data = MyData, Initial.Values = rep(0.01, m),
+                         Covar = diag(m)*36, Iterations = 1000, Thinning = 1,
+                         Algorithm = "ESS", Specs = list(B = NULL))
+```
+
+The full sweep across $m=2..5$, with the "modes visited" bookkeeping and the
+plot, is in `dim_sweep_and_plot.R`.
+
+---
+
+## 11. Honest caveats
+
+- **AFSS's own run-to-run variability is real, not a typo.** The $m=2$ grid
+  gave 3/9 in one execution and 6/9 in another under nominally the same
+  settings — AFSS's periodic re-adaptation is sensitive to exactly which
+  random proposals happen to escape the starting mode early on. The
+  dimension-sweep table above is from a single run at each $m$; expect some
+  variation if you rerun it, though the qualitative collapse with $m$ should
+  persist.
+- **This kernel is deliberately adversarial for ESS/AFSS.** It isolates the
+  one structural weakness a joint-move sampler has (many small,
+  axis-organized, disconnected modes) and removes everything else. It is
+  not a general claim that ASG dominates ESS or AFSS — see the
+  `bimodal_diagonal` results elsewhere in this repo for the reverse case.
+- **`ASG-box` is slow here** (the effective-support box is recomputed every
+  coordinate, every sweep) — `grid` and `adaptive` are the brackets to use
+  for anything beyond a quick check.
+
+## 12. Repository layout
 
 ```
 .
