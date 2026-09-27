@@ -180,30 +180,30 @@ for all three brackets side by side.
 ### Univariate
 
 **Beta mixture** — unbounded spikes, gaps in the support
-![beta_mixture](assets/beta_mixture.png)
+![beta_mixture](figures/beta_mixture.png)
 
 **Five narrow modes** — unequal weights across a wide range
-![five_narrow_modes](assets/five_narrow_modes.png)
+![five_narrow_modes](figures/five_narrow_modes.png)
 
 **Cauchy + spike** — heavy tails plus a distant, very narrow mode
-![cauchy_plus_spike](assets/cauchy_plus_spike.png)
+![cauchy_plus_spike](figures/cauchy_plus_spike.png)
 
 **Oscillating** — Gaussian envelope $\times\sin^2$, many thin modes
-![oscillating](assets/oscillating.png)
+![oscillating](figures/oscillating.png)
 
 ### Bivariate
 
 **Rosenbrock** — curved, banana-shaped ridge
-![rosenbrock](assets/rosenbrock.png)
+![rosenbrock](figures/rosenbrock.png)
 
 **Bimodal (axis-aligned)** — two unequal, well-separated modes
-![bimodal_axis](assets/bimodal_axis.png)
+![bimodal_axis](figures/bimodal_axis.png)
 
 **Bimodal (diagonal)** — the hard case for coordinate-wise sampling
-![bimodal_diagonal](assets/bimodal_diagonal.png)
+![bimodal_diagonal](figures/bimodal_diagonal.png)
 
 **Ring** — thin annulus, disconnected conditional slices
-![ring](assets/ring.png)
+![ring](figures/ring.png)
 
 ---
 
