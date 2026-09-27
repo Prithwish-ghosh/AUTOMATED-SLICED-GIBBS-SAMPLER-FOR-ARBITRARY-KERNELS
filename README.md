@@ -255,5 +255,7 @@ fit <- multivariate_gibbs_sample_ASG(ker, n_samples = 2000, burn_in = 200,
 ├── test_complicated_kernels.R        # stress-test script
 ├── test_complicated_kernels.Rmd      # stress-test report (this README's source)
 ├── asg_test_results.csv              # generated results table
-└── assets/                           # generated plots (this README's figures)
+└── figures/                          # generated plots (this README's figures)
+├── adaptive gibbs.R                  # Adaptive gibbs, HMC, Elliptical Slice and other sampler comparison.
+├── Other R codes                     # Examples and Simulation studies
 ```
