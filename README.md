@@ -211,7 +211,7 @@ install.packages(c("coda"))   # only extra dependency beyond base R
 
 source("effective_support_uni_s.R")
 source("level_set_endpoints.R")
-source("asg_sampler.R")
+source("asg_sample bracket.R")
 
 # quick run
 N1=500 N2=300 BURN=100 Rscript test_complicated_kernels.R
@@ -429,7 +429,7 @@ library(LaplacesDemon)
 library(mcmcse)
 source("effective_support_uni_s.R")
 source("level_set_endpoints.R")
-source("asg_sampler.R")
+source("asg_sample bracket.R")
 
 set.seed(2026)
 vals <- c(-6, 0, 6); sigma <- 0.4
