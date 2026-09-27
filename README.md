@@ -199,9 +199,6 @@ for all three brackets side by side.
 **Bimodal (axis-aligned)** — two unequal, well-separated modes
 ![bimodal_axis](figures/bimodal_axis.png)
 
-**Bimodal (diagonal)** — the hard case for coordinate-wise sampling
-![bimodal_diagonal](figures/bimodal_diagonal.png)
-
 **Ring** — thin annulus, disconnected conditional slices
 ![ring](figures/ring.png)
 
