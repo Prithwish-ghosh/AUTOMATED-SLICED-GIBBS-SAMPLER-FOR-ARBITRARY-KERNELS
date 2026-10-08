@@ -688,7 +688,53 @@ modes_bridge
 ci_bridge <- sapply(S_bridge, quantile, probs = c(0.025, 0.975))
 ci_bridge
 
+library(glmnet)
+data("QuickStartExample")
+y <- QuickStartExample$y
+X <- QuickStartExample$x      # use the same X (raw or standardized) that you used in the sampler
+N <- length(y)
 
+## negative log kernel exactly as in the paper: 0.5*RSS + N*lambda*sum|beta|^alpha  (sigma^2 = 1)
+negLogK <- function(b, lambda, alpha) {
+  mu <- b[1] + as.vector(X %*% b[-1])
+  0.5 * sum((y - mu)^2) + N * lambda * sum(abs(b[-1])^alpha)
+}
+
+## smoothed version so L-BFGS-B can handle the kink at 0:  |b|^alpha ~ (b^2 + eps)^(alpha/2)
+negLogK_smooth <- function(b, lambda, alpha, eps) {
+  mu <- b[1] + as.vector(X %*% b[-1])
+  0.5 * sum((y - mu)^2) + N * lambda * sum((b[-1]^2 + eps)^(alpha / 2))
+}
+
+fit_mode <- function(lambda, alpha, starts, tol0 = 1e-3) {
+  best <- list(val = Inf, par = NULL)
+  for (s in starts) {
+    b <- s
+    for (eps in c(1e-2, 1e-4, 1e-6, 1e-8)) {            # tighten the smoothing in steps
+      b <- optim(b, negLogK_smooth, lambda = lambda, alpha = alpha, eps = eps,
+                 method = "L-BFGS-B", control = list(maxit = 5000))$par
+    }
+    b_th <- b; b_th[-1][abs(b_th[-1]) < tol0] <- 0       # snap tiny coefficients to exact zero
+    v <- negLogK(b_th, lambda, alpha)
+    if (v < best$val) best <- list(val = v, par = b_th)
+  }
+  best
+}
+
+## starting points: zeros, least squares, and the lasso solution
+ols   <- coef(lm(y ~ X))
+las   <- as.numeric(coef(glmnet(X, y, lambda = 0.1)))   # intercept first
+rstrt <- lapply(1:20, function(i) c(rnorm(1, 0, 0.1), rnorm(ncol(X), 0, 0.5)))
+starts <- c(list(rep(0, ncol(X) + 1), as.numeric(ols), las), rstrt)
+
+## sanity check, alpha = 1, lambda = 0.1: should be close to glmnet (the "Lasso Estimate" row)
+chk <- fit_mode(lambda = 0.1, alpha = 1, starts = starts)
+print(round(rbind(mode_alpha1 = chk$par, glmnet = las), 4))
+
+## Bridge estimate, alpha = 0.1, lambda = 0.001 (the "Bridge Estimate" row for Table 7)
+brg <- fit_mode(lambda = 0.001, alpha = 0.1, starts = starts)
+cat("negative log kernel at best mode:", brg$val, "\n")
+print(round(brg$par, 4))              # (beta0, beta1, ..., beta20)
 
 ####### f(x) = ||x||^2 function #######
 
